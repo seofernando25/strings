@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { micList, micGain, analyzer, preferredMic, audioContext, gainNode } from '../lib/mic';
 	import { pitches, startDemo } from '$lib/detection/model';
-	import { pauNoGato } from '$lib/gato';
+	import { pauNoGato, positions } from '$lib/gato';
 	import { min } from '@tensorflow/tfjs';
 
 	let canvas: HTMLCanvasElement;
@@ -211,6 +211,15 @@
 <span>Min Note: {minNote}</span>
 <span>Max Note: {maxNote}</span>
 
+<input
+	bind:value={pitchTestVal}
+	class="input input-bordered m-2"
+	type="text"
+	placeholder="Pithc in hz"
+/>
+
+<span>{frequencyToNote(pitchTestVal)}</span>
+
 <div class="flex gap-2 flex-col rounded p-2 m-2 bg-base-200">
 	<span>Notes List</span>
 	<div class="flex flex-wrap">
@@ -225,4 +234,37 @@
 		{/each}
 	</div>
 	<span class="self-center btn btn-primary btn-wide">Play: {pauNoGato[i]}</span>
+</div>
+
+<!-- 5-8 hz-->
+
+<div class="grid grid-cols-4 place-items-center">
+	<div>
+		{#if positions[pauNoGato[i]] === 0}
+			<span class="btn btn-primary">+</span>
+		{:else}
+			<span class="btn btn-outline">+</span>
+		{/if}
+	</div>
+	<div>
+		{#if positions[pauNoGato[i]] === 1}
+			<span class="btn btn-primary">+</span>
+		{:else}
+			<span class="btn btn-outline">+</span>
+		{/if}
+	</div>
+	<div>
+		{#if positions[pauNoGato[i]] === 2}
+			<span class="btn btn-primary">+</span>
+		{:else}
+			<span class="btn btn-outline">+</span>
+		{/if}
+	</div>
+	<div>
+		{#if positions[pauNoGato[i]] === 3}
+			<span class="btn btn-primary">+</span>
+		{:else}
+			<span class="btn btn-outline">+</span>
+		{/if}
+	</div>
 </div>

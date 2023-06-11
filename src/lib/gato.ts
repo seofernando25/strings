@@ -43,4 +43,15 @@ export const pauNoGato = [
 	'D3',
 	'C3',
 	'C4'
-];
+] as const;
+
+export const positions = {
+	E3: 0,
+	A3: 0,
+	C3: 1,
+	F3: 1,
+	B3: 2,
+	D3: 3,
+	G3: 3,
+	C4: 3
+} as const;

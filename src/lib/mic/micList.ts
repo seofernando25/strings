@@ -23,15 +23,6 @@ export async function updateMicrophoneList() {
 }
 
 if (browser) {
-	// Request microphone permission
-	try {
-		await navigator.mediaDevices.getUserMedia({ audio: true });
-	} catch (e) {
-		if (e === 'NotAllowedError') {
-			console.warn('Microphone permission denied');
-		}
-	}
-
 	updateMicrophoneList();
 	navigator.mediaDevices.removeEventListener('devicechange', updateMicrophoneList);
 	navigator.mediaDevices.addEventListener('devicechange', updateMicrophoneList);
