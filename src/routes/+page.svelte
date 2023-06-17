@@ -3,12 +3,8 @@
 	import { micList, micGain, analyzer, preferredMic, audioContext, gainNode } from '../lib/mic';
 	import { pitches, startDemo } from '$lib/detection/model';
 	import { pauNoGato, positions } from '$lib/gato';
-	import { min } from '@tensorflow/tfjs';
 	import Waveform from '$lib/components/Waveform.svelte';
-	import Spectogram from '$lib/components/Spectogram.svelte';
-	import Waterfall from '$lib/components/Waterfall.svelte';
 
-	let canvas: HTMLCanvasElement;
 	$: bufferLength = $analyzer ? $analyzer.frequencyBinCount : 0;
 	$: dataArray = new Uint8Array(bufferLength);
 	$: pitchesAsNotes = $pitches.map((pitch) => frequencyToNote(pitch));
