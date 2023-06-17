@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { GRAY, STRING_COLORS } from '$lib/colors';
-	import { Canvas, InteractiveObject, OrbitControls, T } from '@threlte/core';
-	import { spring } from 'svelte/motion';
-	import { degToRad } from 'three/src/math/MathUtils';
+	import { Canvas, OrbitControls, T } from '@threlte/core';
 
 	let container: HTMLDivElement;
 	let position: [number, number, number] = [-0.5, 6, -10];
 
 	// 0 to 22 generator
 	let frets = Array.from({ length: 23 }, (_, i) => i);
+
+	const degToRad = (deg: number) => (deg * Math.PI) / 180;
 
 	// 1/1
 	// 2.82842712475/3
