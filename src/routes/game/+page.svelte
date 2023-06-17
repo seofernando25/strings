@@ -1,19 +1,12 @@
 <script lang="ts">
 	import { GRAY, STRING_COLORS } from '$lib/colors';
 	import { Canvas, OrbitControls, T } from '@threlte/core';
+	import { degToRad } from 'three/src/math/MathUtils';
 
-	let container: HTMLDivElement;
 	let position: [number, number, number] = [-0.5, 6, -10];
 
 	// 0 to 22 generator
 	let frets = Array.from({ length: 23 }, (_, i) => i);
-
-	const degToRad = (deg: number) => (deg * Math.PI) / 180;
-
-	// 1/1
-	// 2.82842712475/3
-	// 8/9
-	// 16/17
 
 	/**
 	 * Returns guitar fret ratios
@@ -27,9 +20,11 @@
 	function fret_ratio(fretNum: number): number {
 		return Math.pow(Math.sqrt(8) / 3, fretNum);
 	}
+
+	console.log(fret_ratio(0));
 </script>
 
-<div class="h-screen" bind:this={container}>
+<div class="h-screen">
 	<Canvas>
 		<T.PerspectiveCamera makeDefault {position} fov={60}>
 			<OrbitControls maxPolarAngle={degToRad(80)} enableZoom={true} target={{ y: 6 }} />
@@ -37,27 +32,6 @@
 
 		<T.DirectionalLight castShadow position={[3, 10, -10]} />
 		<T.AmbientLight intensity={0.2} />
-
-		<!-- Cube -->
-		<!-- <T.Group scale={$scale}>
-			<T.Mesh position.y={0.5} castShadow let:ref>
-				<InteractiveObject
-					object={ref}
-					interactive
-					on:pointerenter={() => ($scale = 2)}
-					on:pointerleave={() => ($scale = 1)}
-				/>
-
-				<T.BoxGeometry />
-				<T.MeshStandardMaterial color="#333333" />
-			</T.Mesh>
-		</T.Group> -->
-
-		<!-- Floor -->
-		<!-- <T.Mesh receiveShadow rotation.x={degToRad(-90)}>
-			<T.PlaneGeometry args={[4, 1]} />
-			<T.MeshStandardMaterial color={GRAY} />
-		</T.Mesh> -->
 
 		<!-- Strings -->
 		{#each STRING_COLORS as color, i}
