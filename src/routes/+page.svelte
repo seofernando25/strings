@@ -4,6 +4,9 @@
 	import { pitches, startDemo } from '$lib/detection/model';
 	import { pauNoGato, positions } from '$lib/gato';
 	import { min } from '@tensorflow/tfjs';
+	import Waveform from '$lib/components/Waveform.svelte';
+	import Spectogram from '$lib/components/Spectogram.svelte';
+	import Waterfall from '$lib/components/Waterfall.svelte';
 
 	let canvas: HTMLCanvasElement;
 	$: bufferLength = $analyzer ? $analyzer.frequencyBinCount : 0;
@@ -44,48 +47,10 @@
 		setInterval(() => {
 			let expectedNote = pauNoGato[i];
 			if (pitchesAsNotes.includes(expectedNote)) {
-				console.log('got it');
 				i++;
 			}
 		}, 500);
-
-		render();
 	});
-
-	function render() {
-		let canvasCtx = canvas?.getContext('2d');
-		if (!canvasCtx) return;
-
-		canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-
-		canvasCtx.fillStyle = 'rgb(200, 200, 200)';
-		canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-
-		canvasCtx.lineWidth = 2;
-		canvasCtx.strokeStyle = 'rgb(0, 0, 0)';
-		canvasCtx.beginPath();
-
-		const sliceWidth = (canvas.width * 1.0) / bufferLength;
-		let x = 0;
-
-		for (let i = 0; i < bufferLength; i++) {
-			const v = dataArray[i] / 128.0;
-			const y = v * (canvas.height / 2);
-
-			if (i === 0) {
-				canvasCtx.moveTo(x, y);
-			} else {
-				canvasCtx.lineTo(x, y);
-			}
-
-			x += sliceWidth;
-		}
-
-		canvasCtx.lineTo(canvas.width, canvas.height / 2);
-		canvasCtx.stroke();
-
-		requestAnimationFrame(render);
-	}
 
 	function demoThing() {
 		startDemo();
@@ -197,7 +162,16 @@
 </div>
 <div />
 
-<canvas bind:this={canvas} width="500" height="100" />
+<div class="w-full h-40">
+	<Waveform {bufferLength} {dataArray} />
+</div>
+<!-- <div class="w-full h-40">
+	<Spectogram {dataArray} />
+</div> -->
+
+<!-- <div class="w-full h-40">
+	<Waterfall {dataArray} />
+</div> -->
 
 <!-- Show the first 50 elements of the fft -->
 <div class="w-full flex gap-2">

@@ -5,13 +5,25 @@ import { browser } from '$app/environment';
 export const preferredMic: Writable<MediaDeviceInfo | undefined> = writable();
 
 if (browser) {
+	// Check preferredMic from localStorage
+	const preferredMicFromLocalStorage = localStorage.getItem('preferredMic');
+
 	micList.subscribe((micList) => {
 		if (micList.length === 0) {
 			preferredMic.set(undefined);
 			return;
 		}
 
-		// Initial Setup
+		// Check if preferredMic is in micList
+		const foundPreferredMic = micList.find(
+			(device) => device.deviceId === preferredMicFromLocalStorage
+		);
+		if (foundPreferredMic !== undefined) {
+			preferredMic.set(foundPreferredMic);
+			return;
+		}
+
+		// Set to first one
 		const mic = get(preferredMic);
 		if (mic === undefined) {
 			preferredMic.set(micList[0]);
@@ -27,5 +39,13 @@ if (browser) {
 			// If the preferred microphone is still available, do nothing
 			return;
 		}
+	});
+
+	preferredMic.subscribe((mic) => {
+		if (mic === undefined) {
+			localStorage.removeItem('preferredMic');
+			return;
+		}
+		localStorage.setItem('preferredMic', mic.deviceId);
 	});
 }
