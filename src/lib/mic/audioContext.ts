@@ -1,21 +1,14 @@
-import { type Writable, writable, get } from 'svelte/store';
+import { type Writable, writable } from 'svelte/store';
+import * as Tone from 'tone';
 
-const SAMPLE_RATE = 16000;
-
-export const audioContext: Writable<AudioContext> = writable(
-	new AudioContext({
-		sampleRate: SAMPLE_RATE
-	}),
-	() => {
-		// Try to resume audio if suspended.
-		const interval = setInterval(() => {
-			if (get(audioContext).state === 'suspended') {
-				get(audioContext).resume();
-			}
-		}, 5);
-
-		return () => {
+export const audioContextStarted: Writable<boolean> = writable(false, (set) => {
+	const interval = setInterval(() => {
+		if (Tone.getContext().state === 'running') {
+			console.log('%cAudioContext Started', 'font-size: 20px');
+			set(true);
 			clearInterval(interval);
-		};
-	}
-);
+		} else {
+			set(false);
+		}
+	}, 16);
+});

@@ -8,5 +8,6 @@ export default defineConfig({
 	},
 	ssr: {
 		noExternal: ['three', 'troika-three-text']
-	}
+	},
+	assetsInclude: ['**/*.mxl']
 });

@@ -1,72 +1,218 @@
 <script lang="ts">
+	import MATLAB_JET from '$lib/spectogram/matlabJet';
 	import { onMount } from 'svelte';
 
 	export let dataArray: Uint8Array = new Uint8Array(0);
+	export let rhc = true; // right hand column
+	export let vert = true; // vertical display
 
 	let canvas: HTMLCanvasElement;
-	let width = 0;
-	let height = 0;
+	$: canvasCtx = canvas?.getContext('2d', {
+		willReadFrequently: true
+	});
+	let width = 1;
+	let height = 1;
 
-	// Render the spectrogram
-	function render() {
-		let canvasCtx = canvas?.getContext('2d');
+	let nextLine = 0;
+	let interval = 0; // msec
+	let sgTime = 0;
+	let sgStartTime = 0;
+	let sgDiff = 0;
+	let running = false;
+	let sgMode: 'WF' | 'RS' = 'WF';
+	let timerID: null | ReturnType<typeof setTimeout> = null;
+	let lineRate = 100; // requested line rate for dynamic waterfalls
+
+	$: {
+		setLineRate(lineRate);
+	}
+
+	let tmpImgData: ImageData | null = null;
+
+	$: lineBuf = new ArrayBuffer(height * 4); // 1 line
+	$: lineBuf8 = new Uint8ClampedArray(lineBuf);
+	$: lineImgData = new ImageData(lineBuf8, height, 1); // 1 line of canvas pixels
+
+	$: clearBuf = new ArrayBuffer(height * width * 4); // fills with 0s ie. rgba 0,0,0,0 = transparent
+	$: clearBuf8 = new Uint8ClampedArray(clearBuf);
+	$: blankBuf = new ArrayBuffer(height * 4);
+	$: blankBuf8 = new Uint8ClampedArray(blankBuf);
+	$: blankImgData = new ImageData(blankBuf8, height, 1);
+
+	let startOfs = 0;
+
+	function newLine() {
+		horizontalNewLine();
+		// return vert ? verticalNewLine() : horizontalNewLine();
+	}
+
+	function verticalNewLine() {
 		if (!canvasCtx) return;
-
-		canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-
-		if (dataArray.length === 0) {
-			let fontSize = Math.ceil(canvas.width / 10);
-			canvasCtx.font = `${fontSize}px sans-serif`;
-			canvasCtx.fillStyle = 'rgb(255, 255, 255)';
-			canvasCtx.fillText('No data', 10, canvas.height - 10);
-			requestAnimationFrame(render);
-			return;
+		if (sgMode == 'WF') {
+			if (rhc) {
+				// shift the current display down 1 line, oldest line drops off
+				tmpImgData = canvasCtx.getImageData(0, 0, height, width - 1);
+				canvasCtx.putImageData(tmpImgData, 0, 1);
+			} else {
+				// shift the current display up 1 line, oldest line drops off
+				tmpImgData = canvasCtx.getImageData(0, 1, height, width - 1);
+				canvasCtx.putImageData(tmpImgData, 0, 0);
+			}
 		}
 
-		// Set up the spectrogram parameters
-		const numBins = 256; // Number of frequency bins
-		const timeSlots = 512; // Number of time slots
-		const binWidth = Math.floor(dataArray.length / numBins);
-		const timeSlotWidth = Math.floor(dataArray.length / timeSlots);
-
-		// Create a 2D array to hold the spectrogram data
-		const spectrogram: number[][] = [];
-		for (let i = 0; i < numBins; i++) {
-			spectrogram[i] = new Array(timeSlots).fill(0);
+		for (
+			let sigVal, rgba, opIdx = 0, ipIdx = startOfs;
+			ipIdx < height + startOfs;
+			opIdx += 4, ipIdx++
+		) {
+			sigVal = dataArray[ipIdx] || 0; // if input line too short add zeros
+			rgba = MATLAB_JET[sigVal]; // array of rgba values
+			// byte reverse so number aa bb gg rr
+			lineBuf8[opIdx] = rgba[0]; // red
+			lineBuf8[opIdx + 1] = rgba[1]; // green
+			lineBuf8[opIdx + 2] = rgba[2]; // blue
+			lineBuf8[opIdx + 3] = rgba[3]; // alpha
 		}
+		canvasCtx.putImageData(lineImgData, 0, nextLine);
+		if (sgMode === 'RS') {
+			incrementLine();
+			// if not static draw a white line in front of the current line to indicate new data point
+			if (lineRate) {
+				canvasCtx.putImageData(blankImgData, 0, nextLine);
+			}
+		}
+	}
 
-		// Compute the spectrogram data
-		for (let i = 0; i < numBins; i++) {
-			for (let j = 0; j < timeSlots; j++) {
-				let sum = 0;
-				for (let k = 0; k < binWidth; k++) {
-					sum += dataArray[i * binWidth + k + j * timeSlotWidth];
+	function horizontalNewLine() {
+		if (!canvasCtx) return;
+		if (sgMode == 'WF') {
+			if (rhc) {
+				// shift the current display right 1 line, oldest line drops off
+				tmpImgData = canvasCtx.getImageData(0, 0, width - 1, height);
+				canvasCtx.putImageData(tmpImgData, 1, 0);
+			} else {
+				// shift the current display left 1 line, oldest line drops off
+				tmpImgData = canvasCtx.getImageData(1, 0, width - 1, height);
+				canvasCtx.putImageData(tmpImgData, 0, 0);
+			}
+		}
+		// refresh the page image (it was just shifted)
+		const pageImgData = canvasCtx.getImageData(0, 0, width, height);
+
+		for (let sigVal, rgba, opIdx, ipIdx = 0; ipIdx < height; ipIdx++) {
+			sigVal = dataArray[ipIdx + startOfs] || 0; // if input line too short add zeros
+			rgba = MATLAB_JET[sigVal]; // array of rgba values
+			opIdx = 4 * ((height - ipIdx - 1) * width + nextLine);
+			// byte reverse so number aa bb gg rr
+			pageImgData.data[opIdx] = rgba[0]; // red
+			pageImgData.data[opIdx + 1] = rgba[1]; // green
+			pageImgData.data[opIdx + 2] = rgba[2]; // blue
+			pageImgData.data[opIdx + 3] = rgba[3]; // alpha
+		}
+		if (sgMode === 'RS') {
+			incrementLine();
+			// if not draw a white line in front of the current line to indicate new data point
+			if (lineRate) {
+				for (let j = 0; j < height; j++) {
+					let opIdx: number;
+					if (rhc) {
+						opIdx = 4 * (j * width + nextLine);
+					} else {
+						opIdx = 4 * ((height - j - 1) * width + nextLine);
+					}
+					// byte reverse so number aa bb gg rr
+					pageImgData.data[opIdx] = 255; // red
+					pageImgData.data[opIdx + 1] = 255; // green
+					pageImgData.data[opIdx + 2] = 255; // blue
+					pageImgData.data[opIdx + 3] = 255; // alpha
 				}
-				spectrogram[i][j] = sum / binWidth;
 			}
 		}
+		canvasCtx.putImageData(pageImgData, 0, 0);
+	}
 
-		// Draw the spectrogram
-		const spectrogramWidth = canvas.width;
-		const spectrogramHeight = canvas.height;
-		const binHeight = spectrogramHeight / numBins;
-
-		for (let i = 0; i < numBins; i++) {
-			for (let j = 0; j < timeSlots; j++) {
-				const value = spectrogram[i][j];
-				const x = (j * spectrogramWidth) / timeSlots;
-				const y = spectrogramHeight - (i + 1) * binHeight;
-				const color = `rgb(${value}, ${value}, ${value})`;
-				canvasCtx.fillStyle = color;
-				canvasCtx.fillRect(x, y, spectrogramWidth / timeSlots, binHeight);
+	function incrementLine() {
+		if ((vert && !rhc) || (!vert && rhc)) {
+			nextLine++;
+			if (nextLine >= width) {
+				nextLine = 0;
+			}
+		} else {
+			nextLine--;
+			if (nextLine < 0) {
+				nextLine = width - 1;
 			}
 		}
+	}
 
-		requestAnimationFrame(render);
+	function updateWaterfall() {
+		newLine();
+		sgTime += interval;
+		sgDiff = Date.now() - sgStartTime - sgTime;
+		if (running) {
+			timerID = setTimeout(updateWaterfall, interval - sgDiff);
+		}
+	}
+
+	function stop() {
+		running = false;
+		if (timerID) {
+			clearTimeout(timerID);
+		}
+		// reset where the next line is to be written
+		if (sgMode === 'RS') {
+			if (vert) {
+				nextLine = rhc ? width - 1 : 0;
+			} else {
+				nextLine = rhc ? 0 : width - 1;
+			}
+		} // WF
+		else {
+			nextLine = rhc ? 0 : width - 1;
+		}
+	}
+
+	function start() {
+		sgStartTime = Date.now();
+		sgTime = 0;
+		running = true;
+		updateWaterfall(); // start the update loop
+	}
+
+	function clear() {
+		canvasCtx?.clearRect(0, 0, width, height);
+		// make a white line, it will show the input line for RS displays
+		// blankBuf8.fill(255);
+		// make a full canvas of the color map 0 values
+		// for (let i = 0; i < pxPerLine * lines * 4; i += 4) {
+		// byte reverse so number aa bb gg rr
+		// clearBuf8[i] = MATLAB_JET[0][0]; // red
+		// clearBuf8[i + 1] = MATLAB_JET[0][1]; // green
+		// clearBuf8[i + 2] = MATLAB_JET[0][2]; // blue
+		// clearBuf8[i + 3] = MATLAB_JET[0][3]; // alpha
+		// }
+
+		// canvasCtx?.putImageData(clearImgData, 0, 0);
+	}
+
+	function setLineRate(newRate: number) {
+		if (isNaN(newRate) || newRate > 999 || newRate < 0) {
+			console.error('invalid line rate [0 <= lineRate < 50 lines/sec]');
+			// don't change the lineRate;
+		} else if (newRate === 0) {
+			// static (one pass) raster
+			lineRate = 0;
+		} else {
+			lineRate = newRate;
+			interval = 1000 / lineRate; // msec
+		}
 	}
 
 	onMount(() => {
-		render();
+		// Set willreadfrequently to true to allow the browser to optimize the canvas
+
+		clear();
+		start();
 	});
 </script>
 

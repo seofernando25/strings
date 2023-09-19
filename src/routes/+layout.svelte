@@ -1,6 +1,28 @@
-<script>
+<script lang="ts">
+	import { audioContextStarted } from '$lib/mic/audioContext';
 	import '../app.postcss';
+	import * as Tone from 'tone';
+
+	async function initializeTone() {
+		await Tone.start();
+	}
+
+	function handleKeyDown(event: KeyboardEvent) {
+		if (event.key === 'Tab' && !event.shiftKey) {
+			event.preventDefault();
+		}
+	}
 </script>
+
+{#if !$audioContextStarted}
+	<button
+		class="fixed inset-0 flex items-center justify-center text-4xl md:text-6xl lg:text-7xl text-center font-bold text-white bg-gray-900 bg-opacity-70"
+		on:click={initializeTone}
+		on:keydown={handleKeyDown}
+	>
+		Click anywhere to start AudioContext
+	</button>
+{/if}
 
 <div class="w-full h-screen">
 	<div class="navbar">

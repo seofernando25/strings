@@ -1,240 +1,121 @@
 <script lang="ts">
+	import * as Tone from 'tone';
+	import score from '$lib/assets/lucky.xml?raw';
+	import { Song, type TimeMeasure } from '$lib/song';
 	import { onMount } from 'svelte';
-	import { micList, micGain, analyzer, preferredMic, audioContext, gainNode } from '../lib/mic';
-	import { pitches, startDemo } from '$lib/detection/model';
-	import { pauNoGato, positions } from '$lib/gato';
-	import Waveform from '$lib/components/Waveform.svelte';
+	import { audioContextStarted } from '$lib/mic/audioContext';
 
-	$: bufferLength = $analyzer ? $analyzer.frequencyBinCount : 0;
-	$: dataArray = new Uint8Array(bufferLength);
-	$: pitchesAsNotes = $pitches.map((pitch) => frequencyToNote(pitch));
+	let synth: Tone.PolySynth | null = null;
 
-	const limit = 10;
-	let notes: number[] = [];
-
-	$: minNote = Math.min(...[...notes]);
-	$: maxNote = Math.max(...[...notes]);
-
-	let i = 0;
-
+	const song = new Song(score);
 	onMount(async () => {
-		pitches.subscribe((pitchesList) => {
-			pitchesList.forEach((pitch) => {
-				notes.push(pitch);
-			});
+		const part = song.part('P1');
+		console.log(part);
+		audioContextStarted.subscribe((started) => {
+			console.log('Audio Context Changed');
 
-			if (notes.length > limit) {
-				notes = notes.slice(notes.length - limit, notes.length);
+			console.log(started);
+			if (started) {
+				synth = new Tone.PolySynth(Tone.Synth, {
+					detune: 100
+				}).toDestination();
 			}
-			notes = notes;
 		});
-
-		let node = $gainNode;
-		let audioCtx = $audioContext;
-		if (!node) return;
-		if (!audioCtx) return;
-
-		node.connect(audioCtx.destination);
-		setInterval(() => {
-			$analyzer?.getByteTimeDomainData(dataArray);
-			dataArray = dataArray;
-		}, 50);
-
-		setInterval(() => {
-			let expectedNote = pauNoGato[i];
-			if (pitchesAsNotes.includes(expectedNote)) {
-				i++;
-			}
-		}, 500);
 	});
 
-	function demoThing() {
-		startDemo();
+	let times: { note: number; eventT: number }[] = [];
+	$: selected = 'P1';
+	async function playSong() {
+		times = [];
 
-		setInterval(() => {
-			console.log($pitches);
-		}, 100);
-	}
+		const part = song.part(selected);
 
-	/**
-	 * Converts a frequency to a note
-	 * eg. 82.41 -> E2
-	 * eg. 110 -> A2
-	 * @param hz
-	 */
-	function frequencyToNote(hz: number): string {
-		var A4 = 440.0;
-		var A4_INDEX = 57;
-		const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-		let notes: string[] = [];
-		for (let i = 0; i < 9; i++) {
-			noteNames.forEach((note) => {
-				notes.push(note + i);
+		if (part === undefined) return;
+		const start = Tone.now();
+		let elapsed = Tone.now();
+		Tone.Transport.timeSignature = [4, 4];
+		const cmds: [number, number, number][] = [];
+		let timeSignature: TimeMeasure = {
+			beats: 4,
+			beatType: 4
+		};
+		let tempo = 120;
+		for (const measure of part.measures) {
+			if (measure.timeMeasure) {
+				timeSignature = measure.timeMeasure;
+			}
+			if (measure.tempo) {
+				tempo = measure.tempo;
+			}
+			// First not of a chord doesn't actually is note.isChord
+			const bps = 60 / tempo;
+			for (const note of measure.notes) {
+				const wholeNoteDuration = bps * timeSignature.beatType;
+				const noteDuration = wholeNoteDuration / (note.duration * timeSignature.beatType);
+
+				if (!note.isChord) {
+					elapsed = elapsed + noteDuration;
+				}
+				if (!note.isRest) {
+					times.push({
+						note: note.noteFreq,
+						eventT: elapsed - start
+					});
+					cmds.push([note.noteFreq, noteDuration / 0.9, elapsed]);
+				} else {
+					times.push({
+						note: 0,
+						eventT: elapsed - start
+					});
+				}
+			}
+			times.push({
+				note: 0,
+				eventT: 0
 			});
 		}
 
-		var MINUS = 0;
-		var PLUS = 1;
-
-		var frequency;
-		var r = Math.pow(2.0, 1.0 / 12.0);
-		var cent = Math.pow(2.0, 1.0 / 1200.0);
-		var r_index = 0;
-		var cent_index = 0;
-		var side;
-
-		frequency = A4;
-
-		if (hz >= frequency) {
-			while (hz >= r * frequency) {
-				frequency = r * frequency;
-				r_index++;
-			}
-			while (hz > cent * frequency) {
-				frequency = cent * frequency;
-				cent_index++;
-			}
-			if (cent * frequency - hz < hz - frequency) cent_index++;
-			if (cent_index > 50) {
-				r_index++;
-				cent_index = 100 - cent_index;
-				if (cent_index != 0) side = MINUS;
-				else side = PLUS;
-			} else side = PLUS;
-		} else {
-			while (hz <= frequency / r) {
-				frequency = frequency / r;
-				r_index--;
-			}
-			while (hz < frequency / cent) {
-				frequency = frequency / cent;
-				cent_index++;
-			}
-			if (hz - frequency / cent < frequency - hz) cent_index++;
-			if (cent_index >= 50) {
-				r_index--;
-				cent_index = 100 - cent_index;
-				side = PLUS;
+		// synth?.triggerAttackRelease([note.noteFreq], noteDuration / 2, elapsed);
+		// Aggregating notes that are played at the same time (have the same elapsed time)
+		const aggregated = new Map<number, [number[], number, number]>();
+		for (const cmd of cmds) {
+			const [note, duration, startT] = cmd;
+			if (aggregated.has(startT)) {
+				const command = aggregated.get(startT)!;
+				command[0].push(note);
+				aggregated.set(startT, command);
 			} else {
-				if (cent_index != 0) side = MINUS;
-				else side = PLUS;
+				aggregated.set(startT, [[note], duration, startT]);
 			}
 		}
 
-		var result = notes[A4_INDEX + r_index];
-		// if (side == PLUS) result = result + ' plus ';
-		// else result = result + ' minus ';
-		// result = result + cent_index + ' cents';
-		return result;
-	}
+		for (const cmd of aggregated.values()) {
+			const [notes, duration, startT] = cmd;
+			synth?.triggerAttackRelease(notes, duration, startT);
+		}
 
-	let pitchTestVal = 82;
+		Tone.Transport.start();
+		times = times;
+
+		console.log('Done Scheduling music');
+	}
 </script>
 
-<!-- <button class="btn w-full btn-primary h-40" on:click={initAudio}> AAA</button> -->
+<button on:click={playSong} class="btn">Play Song</button>
 
-<button class="btn btn-primary btn-wide m-2" on:click={demoThing}>Start Demo</button>
-
-<p>Volume</p>
-<input class="range" bind:value={$micGain} type="range" min="0" max="2" step="0.1" />
-
-<div>
-	<select bind:value={$preferredMic}>
-		<option value={undefined}>Select a microphone</option>
-		{#each $micList as mic}
-			<option value={mic}>{mic.label}</option>
+{#if song.partsInfo().length > 0}
+	<select bind:value={selected} class="select select-bordered w-full max-w-xs">
+		{#each song.partsInfo() as part}
+			<option value={part.id}>{part.name}</option>
 		{/each}
 	</select>
-</div>
-<div>
-	<span
-		>Selected:
-		{#if $preferredMic}
-			{$preferredMic.label}
-		{:else}
-			None
-		{/if}
-	</span>
-</div>
-<div />
+{/if}
 
-<div class="w-full h-40">
-	<Waveform {bufferLength} {dataArray} />
-</div>
-<!-- <div class="w-full h-40">
-	<Spectogram {dataArray} />
-</div> -->
-
-<!-- <div class="w-full h-40">
-	<Waterfall {dataArray} />
-</div> -->
-
-<!-- Show the first 50 elements of the fft -->
-<div class="w-full flex gap-2">
-	{#each $pitches as pitch}
-		<!-- <span>{pitch}</span> -->
-		<!-- Rounded to int -->
-		<span class="bg-gray-200 text-primary rounded-full px-2">{frequencyToNote(pitch)}</span>
+<div class="flex flex-col gap-2">
+	{#each times as { note, eventT }}
+		<div class="flex gap-2">
+			<div class="w-10">{note}</div>
+			<div class="w-10">{eventT}</div>
+		</div>
 	{/each}
-</div>
-
-<span>Min Note: {minNote}</span>
-<span>Max Note: {maxNote}</span>
-
-<input
-	bind:value={pitchTestVal}
-	class="input input-bordered m-2"
-	type="text"
-	placeholder="Pithc in hz"
-/>
-
-<span>{frequencyToNote(pitchTestVal)}</span>
-
-<div class="flex gap-2 flex-col rounded p-2 m-2 bg-base-200">
-	<span>Notes List</span>
-	<div class="flex flex-wrap">
-		{#each pauNoGato as note, cur}
-			{#if i < cur}
-				<span class="bg-gray-200 text-primary rounded-full px-2">{note}</span>
-			{:else if i === cur}
-				<span class="bg-blue-200 text-primary rounded-full px-2">{note}</span>
-			{:else}
-				<span class="bg-green-200 text-primary rounded-full px-2">{note}</span>
-			{/if}
-		{/each}
-	</div>
-	<span class="self-center btn btn-primary btn-wide">Play: {pauNoGato[i]}</span>
-</div>
-
-<!-- 5-8 hz-->
-
-<div class="grid grid-cols-4 place-items-center">
-	<div>
-		{#if positions[pauNoGato[i]] === 0}
-			<span class="btn btn-primary">+</span>
-		{:else}
-			<span class="btn btn-outline">+</span>
-		{/if}
-	</div>
-	<div>
-		{#if positions[pauNoGato[i]] === 1}
-			<span class="btn btn-primary">+</span>
-		{:else}
-			<span class="btn btn-outline">+</span>
-		{/if}
-	</div>
-	<div>
-		{#if positions[pauNoGato[i]] === 2}
-			<span class="btn btn-primary">+</span>
-		{:else}
-			<span class="btn btn-outline">+</span>
-		{/if}
-	</div>
-	<div>
-		{#if positions[pauNoGato[i]] === 3}
-			<span class="btn btn-primary">+</span>
-		{:else}
-			<span class="btn btn-outline">+</span>
-		{/if}
-	</div>
 </div>
