@@ -25,17 +25,17 @@
 			if (started) {
 				Tone.Transport.start();
 				synth = new Tone.PolySynth(Tone.Synth, {
-					volume: -15,
+					volume: -8,
 					oscillator: {
-						type: 'sawtooth'
+						type: 'amtriangle20'
 					},
 					portamento: 0,
 					detune: 0,
 					envelope: {
-						decay: 0.1,
-						sustain: 0,
-						release: 0,
-						attack: 0.1
+						attack: 0.01,
+						decay: 0.2,
+						release: 1,
+						sustain: 0
 					}
 				}).toDestination();
 			}
@@ -133,7 +133,7 @@
 			<input
 				type="range"
 				min="0"
-				max="15"
+				max="150"
 				step="0.01"
 				bind:value={$songPlaybackTimeDisplay}
 				class="range w-full"
