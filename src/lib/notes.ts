@@ -13,6 +13,45 @@ export const CHROMATIC_NOTES = [
 	'B'
 ] as const;
 
+export const noteStringToNoteLength = {
+	'1024th': 1 / 1024,
+	'512th': 1 / 512,
+	'256th': 1 / 256,
+	'128th': 1 / 128,
+	'64th': 1 / 64,
+	'32nd': 1 / 32,
+	'16th': 1 / 16,
+	eighth: 1 / 8,
+	quarter: 1 / 4,
+	half: 1 / 2,
+	whole: 1,
+	breve: 2,
+	long: 4,
+	maxima: 8
+} as const;
+
+export const noteToDivisions = {
+	'1024th': 1024,
+	'512th': 512,
+	'256th': 256,
+	'128th': 128,
+	'64th': 64,
+	'32nd': 32,
+	'16th': 16,
+	eighth: 8,
+	quarter: 4,
+	half: 2,
+	whole: 1,
+	breve: 0.5,
+	long: 0.25,
+	maxima: 0.125
+} as const;
+
+export type NoteType = keyof typeof noteStringToNoteLength;
+export type NormalNoteLength = (typeof noteStringToNoteLength)[NoteType];
+
+export type NoteWithOctave = `${ChromaticNote}${number}`;
+
 export type ChromaticNote = (typeof CHROMATIC_NOTES)[number];
 
 export const NOTES: Note[] = Array.from({ length: 9 }, (_, i) => {
@@ -32,6 +71,10 @@ export type Note = {
 	octave: number;
 	cents: number;
 };
+
+export function noteToNoteWithOctave(note: Note): NoteWithOctave {
+	return `${note.note}${note.octave}` as NoteWithOctave;
+}
 
 /**
  * Converts a frequency to a note

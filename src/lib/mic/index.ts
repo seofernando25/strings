@@ -2,7 +2,6 @@
 // We export all their defaults
 
 export { monoMicNode } from './monoMicNode';
-export { audioContext } from './audioContext';
 export { analyzer } from './analyzer';
 export { micGain, gainNode } from './micGain';
 export { rawMicNode as micNode } from './rawMicNode';

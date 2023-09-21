@@ -1,8 +1,7 @@
 import { get, writable, type Writable } from 'svelte/store';
 import { browser } from '$app/environment';
-import { audioContext } from './audioContext';
 import { monoMicNode } from './monoMicNode';
-
+import * as Tone from 'tone';
 export const micGain: Writable<number> = writable(1);
 
 export const gainNode: Writable<GainNode | undefined> = writable(undefined, (set) => {
@@ -12,7 +11,7 @@ export const gainNode: Writable<GainNode | undefined> = writable(undefined, (set
 
 	if (browser) {
 		const createGainNode = async () => {
-			const ctx = get(audioContext);
+			const ctx = Tone.getContext();
 			if (!ctx) return;
 			const mic = get(monoMicNode);
 			if (!mic) return;
@@ -52,7 +51,7 @@ async function createGainNode() {
 		return;
 	}
 
-	const audioCtx = get(audioContext);
+	const audioCtx = Tone.getContext();
 	if (audioCtx === undefined) {
 		return;
 	}

@@ -1,7 +1,8 @@
 import { type Writable, writable, get } from 'svelte/store';
 import { preferredMic } from './preferredMic';
-import { audioContext } from './audioContext';
 import { browser } from '$app/environment';
+import * as Tone from 'tone';
+import { audioContextStarted } from './audioContext';
 
 export const rawMicNode: Writable<MediaStreamAudioSourceNode | undefined> = writable();
 
@@ -13,7 +14,7 @@ async function updateMicrophoneNode() {
 
 	// Check if we have everything we need
 	const mic = get(preferredMic);
-	const audioCtx = get(audioContext);
+	const audioCtx = Tone.getContext();
 	if (mic === undefined || audioCtx === undefined) {
 		rawMicNode.set(undefined);
 		return;
@@ -33,7 +34,7 @@ async function updateMicrophoneNode() {
 
 if (browser) {
 	preferredMic.subscribe(updateMicrophoneNode);
-	audioContext.subscribe(updateMicrophoneNode);
+	audioContextStarted.subscribe(updateMicrophoneNode);
 }
 
 export default rawMicNode;

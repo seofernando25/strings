@@ -1,29 +1,38 @@
 import * as tf from '@tensorflow/tfjs';
-import { audioContext, gainNode } from '../mic';
+import { gainNode } from '../mic';
 import { type Writable, writable, get } from 'svelte/store';
-
+import * as Tone from 'tone';
 const NUM_INPUT_SAMPLES = 1024;
+import workletUrl from './worklet.audioworklet.ts?url';
+
 const CONF_THRESHOLD = 0.75;
 const MODEL_URL = 'https://tfhub.dev/google/tfjs-model/spice/2/default/1';
 let model: tf.GraphModel;
 
-export const pitches: Writable<number[]> = writable([], (set) => {
-	let started = false;
-	const start = async () => {
-		model = await tf.loadGraphModel(MODEL_URL, { fromTFHub: true });
-		started = true;
-	};
-	start();
+console.log('worklet', workletUrl);
+export const pitches: Writable<number[]> = writable([], () => {
+	// const size = Int32Array.BYTES_PER_ELEMENT * NUM_INPUT_SAMPLES;
+	// const sab = new SharedArrayBuffer(size);
+	// const sharedArray = new Int32Array(sab);
+
+	tf.loadGraphModel(MODEL_URL, { fromTFHub: true })
+		.then((m) => {
+			model = m;
+		})
+		.catch((e) => {
+			console.log(e);
+		});
 
 	let processor: ScriptProcessorNode | undefined = undefined;
 	const run = async () => {
-		const audioCtx = get(audioContext);
+		const audioCtx = Tone.getContext();
 		const source = get(gainNode);
 		if (!audioCtx) return;
 		if (!source) return;
 
 		if (!processor) {
-			processor = audioCtx?.createScriptProcessor(NUM_INPUT_SAMPLES, 1, 1);
+			audioCtx?.addAudioWorkletModule(workletUrl, 'pitch-detection-processor');
+			processor = audioCtx?.rawContext.createScriptProcessor(NUM_INPUT_SAMPLES, 1, 1);
 		} else {
 			processor.disconnect();
 			processor.removeEventListener('audioprocess', audioProc);
@@ -33,7 +42,7 @@ export const pitches: Writable<number[]> = writable([], (set) => {
 		processor.channelInterpretation = 'speakers';
 		processor.channelCount = 1;
 		source?.connect(processor);
-		processor.connect(audioCtx.destination);
+		processor.connect(audioCtx.rawContext.destination);
 		processor.addEventListener('audioprocess', audioProc);
 	};
 
@@ -45,13 +54,13 @@ export const pitches: Writable<number[]> = writable([], (set) => {
 });
 
 export async function startDemo() {
-	const audioCtx = get(audioContext);
+	const audioCtx = Tone.getContext();
 	if (!audioCtx) {
 		console.log('context is undefined');
 		return;
 	}
 	const source = get(gainNode);
-	const processor = audioCtx?.createScriptProcessor(NUM_INPUT_SAMPLES, 1, 1);
+	const processor = audioCtx?.rawContext.createScriptProcessor(NUM_INPUT_SAMPLES, 1, 1);
 	if (!processor) {
 		console.log('processor is undefined');
 		return;
@@ -61,7 +70,7 @@ export async function startDemo() {
 	processor.channelCount = 1;
 	// Runs processor on audio source.
 	source?.connect(processor);
-	processor.connect(audioCtx.destination);
+	processor.connect(audioCtx.rawContext.destination);
 	processor.addEventListener('audioprocess', audioProc);
 }
 

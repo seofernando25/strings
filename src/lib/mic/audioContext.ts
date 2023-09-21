@@ -1,14 +1,29 @@
+import { browser } from '$app/environment';
 import { type Writable, writable } from 'svelte/store';
-import * as Tone from 'tone';
 
 export const audioContextStarted: Writable<boolean> = writable(false, (set) => {
-	const interval = setInterval(() => {
-		if (Tone.getContext().state === 'running') {
-			console.log('%cAudioContext Started', 'font-size: 20px');
-			set(true);
-			clearInterval(interval);
-		} else {
-			set(false);
+	if (!browser) {
+		return;
+	}
+
+	const initialStateSub = audioContextStarted.subscribe(async (started) => {
+		if (!started) {
+			return;
 		}
-	}, 16);
+		initialStateSub();
+		const tone = await import('tone');
+		console.log(`%cAudioContext: ${tone.getContext().state}`, 'font-size: 20px');
+
+		const interval = setInterval(() => {
+			if (tone.getContext().state === 'running') {
+				set(true);
+				clearInterval(interval);
+			} else {
+				console.log(`%cAudioContext: ${tone.getContext().state}`, 'font-size: 20px');
+				set(false);
+			}
+		}, 16);
+
+		return;
+	});
 });

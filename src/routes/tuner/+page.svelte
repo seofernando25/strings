@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { micList, analyzer, preferredMic, audioContext, gainNode } from '$lib/mic';
+	import { micList, analyzer, preferredMic, gainNode } from '$lib/mic';
 	import { pitches } from '$lib/detection/model';
 	import Waveform from '$lib/components/Waveform.svelte';
 	import { noteToFreqSimple, type Note, type ChromaticNote } from '$lib/notes';
 	import Tuner from '$lib/components/Tuner.svelte';
 	import { BASE_TUNINGS } from '$lib/tunings';
+	import * as Tone from 'tone';
 
 	$: bufferLength = $analyzer ? $analyzer.frequencyBinCount : 0;
 	$: dataArray = new Uint8Array(bufferLength);
@@ -59,11 +60,11 @@
 		});
 
 		let node = $gainNode;
-		let audioCtx = $audioContext;
+		let audioCtx = Tone.getContext();
 		if (!node) return;
 		if (!audioCtx) return;
 
-		node.connect(audioCtx.destination);
+		node.connect(audioCtx.rawContext.destination);
 		setInterval(() => {
 			$analyzer?.getByteTimeDomainData(dataArray);
 			dataArray = dataArray;

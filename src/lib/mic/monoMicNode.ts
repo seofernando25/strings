@@ -1,7 +1,7 @@
 import { type Writable, writable, get } from 'svelte/store';
-import { audioContext } from './audioContext';
 import { browser } from '$app/environment';
 import rawMicNode from './rawMicNode';
+import * as Tone from 'tone';
 
 export const monoMicNode: Writable<ChannelMergerNode | undefined> = writable(undefined, (set) => {
 	let splitter: ChannelSplitterNode | undefined = undefined;
@@ -11,7 +11,7 @@ export const monoMicNode: Writable<ChannelMergerNode | undefined> = writable(und
 
 	if (browser) {
 		const updateMic = async () => {
-			const ctx = get(audioContext);
+			const ctx = Tone.getContext();
 			if (!ctx) return;
 			const mic = get(rawMicNode);
 			if (!mic) return;

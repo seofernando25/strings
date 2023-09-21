@@ -1,7 +1,7 @@
 import { type Writable, writable, get } from 'svelte/store';
-import { audioContext } from './audioContext';
 import { browser } from '$app/environment';
 import { gainNode } from './micGain';
+import * as Tone from 'tone';
 
 export const analyzer: Writable<AnalyserNode | undefined> = writable(undefined, (set) => {
 	let analyzer: AnalyserNode | undefined = undefined;
@@ -9,7 +9,7 @@ export const analyzer: Writable<AnalyserNode | undefined> = writable(undefined, 
 
 	if (browser) {
 		const updateAnalyzer = async () => {
-			const ctx = get(audioContext);
+			const ctx = Tone.getContext();
 			if (!ctx) return;
 			const mic = get(gainNode);
 			if (!mic) return;

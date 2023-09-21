@@ -1,120 +1,151 @@
 <script lang="ts">
-	import * as Tone from 'tone';
-	import score from '$lib/assets/lucky.xml?raw';
-	import { Song, type TimeMeasure } from '$lib/song';
-	import { onMount } from 'svelte';
+	import score from '$lib/assets/music.xml?raw';
+	import { Song, pitchToString, type MusicEvent } from '$lib/songParser/song';
+	import { onDestroy, onMount } from 'svelte';
 	import { audioContextStarted } from '$lib/mic/audioContext';
+	import * as Tone from 'tone';
+	import { browser } from '$app/environment';
+	import { tweened } from 'svelte/motion';
 
 	let synth: Tone.PolySynth | null = null;
-
-	const song = new Song(score);
+	let song: Song | null = null;
 	onMount(async () => {
+		song = new Song(score);
+		if (crossOriginIsolated) {
+			console.log('crossOriginIsolated');
+		} else {
+			console.log('not crossOriginIsolated');
+		}
+
 		const part = song.part('P1');
-		console.log(part);
 		audioContextStarted.subscribe((started) => {
 			console.log('Audio Context Changed');
 
 			console.log(started);
 			if (started) {
+				Tone.Transport.start();
 				synth = new Tone.PolySynth(Tone.Synth, {
-					detune: 100
+					volume: -15,
+					oscillator: {
+						type: 'sawtooth'
+					},
+					portamento: 0,
+					detune: 0,
+					envelope: {
+						decay: 0.1,
+						sustain: 0,
+						release: 0,
+						attack: 0.1
+					}
 				}).toDestination();
 			}
 		});
 	});
 
-	let times: { note: number; eventT: number }[] = [];
+	let songPlayback: Tone.ToneEvent | null = null;
+	$: songPlaybackTimeDisplay = tweened(0, {
+		duration: 50,
+		easing: (t) => t * t
+	});
+
+	let times: { note: number; eventT: any }[] = [];
 	$: selected = 'P1';
+	$: songPart = song?.part(selected);
 	async function playSong() {
-		times = [];
+		let measuresArr = songPart?.measures ?? [];
 
-		const part = song.part(selected);
+		let allEvents: MusicEvent[] = measuresArr.flatMap((m) => m.events);
+		Tone.Transport.loop = false;
+		songPlayback = new Tone.ToneEvent((time, ev) => {
+			for (const musicEvent of ev) {
+				let baseT = musicEvent.measure.time + musicEvent.time;
+				Tone.Draw.schedule(function () {
+					songPlaybackTimeDisplay.set(baseT);
+				}, baseT);
 
-		if (part === undefined) return;
-		const start = Tone.now();
-		let elapsed = Tone.now();
-		Tone.Transport.timeSignature = [4, 4];
-		const cmds: [number, number, number][] = [];
-		let timeSignature: TimeMeasure = {
-			beats: 4,
-			beatType: 4
-		};
-		let tempo = 120;
-		for (const measure of part.measures) {
-			if (measure.timeMeasure) {
-				timeSignature = measure.timeMeasure;
-			}
-			if (measure.tempo) {
-				tempo = measure.tempo;
-			}
-			// First not of a chord doesn't actually is note.isChord
-			const bps = 60 / tempo;
-			for (const note of measure.notes) {
-				const wholeNoteDuration = bps * timeSignature.beatType;
-				const noteDuration = wholeNoteDuration / (note.duration * timeSignature.beatType);
-
-				if (!note.isChord) {
-					elapsed = elapsed + noteDuration;
-				}
-				if (!note.isRest) {
-					times.push({
-						note: note.noteFreq,
-						eventT: elapsed - start
-					});
-					cmds.push([note.noteFreq, noteDuration / 0.9, elapsed]);
-				} else {
-					times.push({
-						note: 0,
-						eventT: elapsed - start
-					});
+				if (musicEvent.type === 'rest') {
+					//
+				} else if (musicEvent.type === 'signature_change') {
+					// Tone.Transport.timeSignature = [musicEvent.nBeats, musicEvent.beatType];
+				} else if (musicEvent.type === 'tempo_change') {
+					Tone.Transport.bpm.setValueAtTime(musicEvent.bpm, baseT);
+				} else if (musicEvent.type === 'note_play') {
+					const duration = musicEvent.duration;
+					const pitch = pitchToString(musicEvent.pitch);
+					synth?.triggerAttackRelease(pitch, duration, baseT);
 				}
 			}
-			times.push({
-				note: 0,
-				eventT: 0
-			});
-		}
+		}, allEvents);
 
-		// synth?.triggerAttackRelease([note.noteFreq], noteDuration / 2, elapsed);
-		// Aggregating notes that are played at the same time (have the same elapsed time)
-		const aggregated = new Map<number, [number[], number, number]>();
-		for (const cmd of cmds) {
-			const [note, duration, startT] = cmd;
-			if (aggregated.has(startT)) {
-				const command = aggregated.get(startT)!;
-				command[0].push(note);
-				aggregated.set(startT, command);
-			} else {
-				aggregated.set(startT, [[note], duration, startT]);
-			}
-		}
-
-		for (const cmd of aggregated.values()) {
-			const [notes, duration, startT] = cmd;
-			synth?.triggerAttackRelease(notes, duration, startT);
-		}
-
-		Tone.Transport.start();
-		times = times;
-
+		songPlayback.start();
 		console.log('Done Scheduling music');
+	}
+
+	let isPlaying = false;
+	function togglePlayback() {
+		if (isPlaying) {
+			Tone.Transport.pause();
+			Tone.Transport.stop(0);
+		} else {
+			Tone.Transport.start();
+		}
+
+		isPlaying = !isPlaying;
+	}
+
+	onDestroy(() => {
+		if (browser) {
+			console.log('destroyed');
+		}
+	});
+
+	function setPlaybackTime(desiredPlaybackTime: number) {
+		if (!songPlayback) {
+			return;
+		}
+		console.log('setPlaybackTime');
+		songPlayback.start(desiredPlaybackTime);
 	}
 </script>
 
-<button on:click={playSong} class="btn">Play Song</button>
+{#if song}
+	<header class="bg-gray-800 text-white py-4 px-8 flex justify-between items-center">
+		<h1 class="text-2xl font-bold">{song?.title()} by {song?.artist()}</h1>
+		{#if song?.partsInfo().length > 0}
+			<select bind:value={selected} class="select select-bordered w-full max-w-xs ml-4">
+				{#each song?.partsInfo() as part}
+					<option value={part?.id}>{part?.name}</option>
+				{/each}
+			</select>
+		{/if}
+	</header>
 
-{#if song.partsInfo().length > 0}
-	<select bind:value={selected} class="select select-bordered w-full max-w-xs">
-		{#each song.partsInfo() as part}
-			<option value={part.id}>{part.name}</option>
-		{/each}
-	</select>
+	<div class="p-4 flex flex-col gap-4">
+		<button on:click={playSong} class="btn btn-primary w-full">Play Song</button>
+		<button on:click={togglePlayback} class="btn btn-primary w-full">
+			{isPlaying ? 'Click to Pause' : 'Click to Play'}
+		</button>
+
+		<!-- Slider -->
+		<!-- content here -->
+		<div class="flex items-center gap-4">
+			<div class="w-10">{$songPlaybackTimeDisplay.toFixed(2)}</div>
+			<input
+				type="range"
+				min="0"
+				max="15"
+				step="0.01"
+				bind:value={$songPlaybackTimeDisplay}
+				class="range w-full"
+			/>
+		</div>
+	</div>
 {/if}
 
 <div class="flex flex-col gap-2">
 	{#each times as { note, eventT }}
 		<div class="flex gap-2">
-			<div class="w-10">{note}</div>
+			<div class="w-10">{note == 0 ? 'Rest' : note}</div>
 			<div class="w-10">{eventT}</div>
 		</div>
 	{/each}

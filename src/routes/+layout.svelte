@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { audioContextStarted } from '$lib/mic/audioContext';
+	import { onMount } from 'svelte';
 	import '../app.postcss';
 	import * as Tone from 'tone';
 
 	async function initializeTone() {
 		await Tone.start();
+		audioContextStarted.set(true);
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
@@ -12,6 +14,11 @@
 			event.preventDefault();
 		}
 	}
+
+	let tone: typeof import('tone');
+	onMount(async () => {
+		tone = await import('tone');
+	});
 </script>
 
 {#if !$audioContextStarted}

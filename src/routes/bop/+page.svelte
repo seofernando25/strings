@@ -1,14 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { micList, micGain, analyzer, preferredMic, audioContext, gainNode } from '$lib/mic';
+	import { micList, micGain, analyzer, preferredMic, gainNode } from '$lib/mic';
 	import { pitches, startDemo } from '$lib/detection/model';
 	import { pauNoGato, positions } from '$lib/gato';
 	import Waveform from '$lib/components/Waveform.svelte';
-	import { frequencyToNote } from '$lib/notes';
+	import { frequencyToNote, noteToNoteWithOctave } from '$lib/notes';
+	import * as Tone from 'tone';
 
 	$: bufferLength = $analyzer ? $analyzer.frequencyBinCount : 0;
 	$: dataArray = new Uint8Array(bufferLength);
-	$: pitchesAsNotes = $pitches.map((pitch) => frequencyToNote(pitch));
+	$: pitchesAsNotes = $pitches
+		.map((pitch) => frequencyToNote(pitch))
+		.map((note) => noteToNoteWithOctave(note));
 
 	const limit = 10;
 	let notes: number[] = [];
@@ -31,11 +34,11 @@
 		});
 
 		let node = $gainNode;
-		let audioCtx = $audioContext;
+		let audioCtx = Tone.getContext();
 		if (!node) return;
 		if (!audioCtx) return;
 
-		node.connect(audioCtx.destination);
+		node.connect(audioCtx.rawContext.destination);
 		setInterval(() => {
 			$analyzer?.getByteTimeDomainData(dataArray);
 			dataArray = dataArray;
