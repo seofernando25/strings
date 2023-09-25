@@ -1,23 +1,19 @@
+import { noteStringToNoteLength, type NoteType } from '$lib/notes';
 import {
 	getParserContext,
 	pushEvent,
 	type Pitch,
 	type RestEvent,
 	type NotePlayEvent,
-	setParserContext
+	setParserContext,
+	type TimeMeasure
 } from '../song';
-import { runSelectors } from '../utils';
+import { elDuration, measureDuration, runSelectors } from '../utils';
 
 export function handleNote(noteEl: Element) {
-	// Check if it doesn't have a chord
-	const chord = noteEl.querySelector('chord');
-	if (!chord) {
-		setParserContext<number>('lastNonChordOffset', getParserContext<number>('noteOffset') ?? 0);
-	}
-
 	const selectors: [string[], (el: Element) => unknown][] = [
 		[['pitch', '!chord'], handleSingleNote], // has pitch, is not a chord, is not a rest
-		[['chord', 'pitch'], handleChord], // has chord, has pitch
+		[['pitch', 'chord'], handleChord], // has chord, has pitch
 		[['rest'], handleRest] // has rest
 	];
 
@@ -44,36 +40,29 @@ function getFingerTech(noteEl: Element) {
 }
 
 function handleSingleNote(noteEl: Element) {
+	setParserContext<number>('lastNonChordOffset', getParserContext<number>('noteOffset') ?? 0);
 	const pitch = fetchPitch(noteEl.querySelector('pitch')!);
 	const fingerTech = getFingerTech(noteEl);
 
-	// TODO: Quadruple check this
-	// Convert note duration to seconds
-	const duration = parseInt(noteEl.querySelector('duration')?.textContent ?? '0') / 1000;
 	const noteEvent: NotePlayEvent = {
 		type: 'note_play',
 		pitch,
 		time: getParserContext<number>('noteOffset') ?? 0,
-		duration,
+		duration: elDuration(noteEl),
 		measure: getParserContext('measure')!,
 		fingerTech
 	};
 
 	// Increase note offset
-	setParserContext<number>('noteOffset', duration + (getParserContext<number>('noteOffset') ?? 0));
+	setParserContext<number>(
+		'noteOffset',
+		elDuration(noteEl) + (getParserContext<number>('noteOffset') ?? 0)
+	);
 	pushEvent(noteEvent);
 }
 
 function handleRest(noteEl: Element) {
-	const restDuration = noteEl.querySelector('duration')!;
-
-	const restDurationText = restDuration.textContent;
-	if (restDurationText === null) {
-		console.log("Didn't find rest duration");
-		return;
-	}
-	// const restDurationSeconds = calculateDuration(parseInt(restDuration.textContent ?? '0'));
-	const restDurationSeconds = parseInt(restDurationText) / 1000;
+	const restDurationSeconds = elDuration(noteEl);
 	// Get note offset
 	const noteOffset = getParserContext<number>('noteOffset') ?? 0;
 	const restEvent: RestEvent = {
@@ -90,13 +79,7 @@ function handleRest(noteEl: Element) {
 function handleChord(noteEl: Element) {
 	const pitch = fetchPitch(noteEl.querySelector('pitch')!);
 
-	const durationEl = noteEl.querySelector('duration')!;
-	const restDurationText = durationEl.textContent;
-	if (restDurationText === null) {
-		console.log("Didn't find rest duration");
-		return;
-	}
-	const duration = parseInt(restDurationText) / 1000;
+	const duration = elDuration(noteEl);
 
 	const noteEvent: NotePlayEvent = {
 		type: 'note_play',

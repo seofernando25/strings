@@ -31,12 +31,13 @@
 	</button>
 {/if}
 
-<div class="w-full h-screen">
+<div class="w-full h-screen flex flex-col">
 	<div class="navbar">
 		<div class="flex-1 gap-2">
 			<a class="btn btn-ghost normal-case text-xl" href="/">SStrings</a>
 			<a class="btn btn-ghost normal-case text-xl" href="/tuner">Tuner</a>
 			<a class="btn btn-ghost normal-case text-xl" href="/game">Game</a>
+			<a class="btn btn-ghost normal-case text-xl" href="/spectrogram">Spectrogram</a>
 		</div>
 		<div class="flex-none gap-2">
 			<a href="/settings" class="btn btn-outline">⚙️</a>
@@ -47,19 +48,6 @@
 				<label tabindex="0" class="btn btn-ghost btn-circle avatar">
 					<div class="w-10 rounded-full bg-white" />
 				</label>
-				<!-- <ul
-					tabindex="0"
-					class="menu menu-sm dropdown-content mt-3 p-2 shadow bg-base-100 rounded-box w-52"
-				>
-					<li>
-						<a class="justify-between">
-							Profile
-							<span class="badge">New</span>
-						</a>
-					</li>
-					<li><a>Settings</a></li>
-					<li><a>Logout</a></li>
-				</ul> -->
 			</div>
 		</div>
 	</div>

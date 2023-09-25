@@ -1,6 +1,12 @@
 <script lang="ts">
 	import score from '$lib/assets/music.xml?raw';
-	import { Song, pitchToString, type MusicEvent } from '$lib/songParser/song';
+	import {
+		Song,
+		pitchToString,
+		type MusicEvent,
+		getSongPartEventRawTimed,
+		playSongPart
+	} from '$lib/songParser/song';
 	import { onDestroy, onMount } from 'svelte';
 	import { audioContextStarted } from '$lib/mic/audioContext';
 	import * as Tone from 'tone';
@@ -18,7 +24,7 @@
 	$: songPlaybackTime = 0;
 	onMount(async () => {
 		song = new Song(score);
-		songClock.setTimeline(song.getPartMusicEventsRawTimed('P1'));
+		songClock.setTimeline(getSongPartEventRawTimed(song.parts.find((part) => part.id === 'P1')!));
 
 		songClock.addEventListener(({ time, event, remaining }) => {
 			songPlaybackTime = time;
@@ -28,8 +34,6 @@
 		setInterval(() => {
 			songPlaybackTime += songClock?.getDelta() ?? 0;
 		}, 10);
-
-		songClock.start();
 
 		if (crossOriginIsolated) {
 			console.log('crossOriginIsolated');
@@ -68,13 +72,13 @@
 
 	let times: { note: number; eventT: any }[] = [];
 	$: selected = 'P1';
-	$: songPart = song?.part(selected);
+	$: songPart = song?.parts.find((part) => part.id === selected)!;
 	async function playSong() {
 		const songPartMaybe = songPart;
 		if (!songPartMaybe) {
 			return;
 		}
-		song?.playSong(songPartMaybe.id);
+		playSongPart(songPartMaybe);
 	}
 
 	let isPlaying = false;
@@ -98,10 +102,10 @@
 
 {#if song}
 	<header class="bg-gray-800 text-white py-4 px-8 flex justify-between items-center">
-		<h1 class="text-2xl font-bold">{song?.title()} by {song?.artist()}</h1>
-		{#if song?.partsInfo().length > 0}
+		<h1 class="text-2xl font-bold">{song?.title} by {song?.artist}</h1>
+		{#if song.parts.length > 0}
 			<select bind:value={selected} class="select select-bordered w-full max-w-xs ml-4">
-				{#each song?.partsInfo() as part}
+				{#each song?.parts as part}
 					<option value={part?.id}>{part?.name}</option>
 				{/each}
 			</select>

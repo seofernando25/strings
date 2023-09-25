@@ -28,7 +28,7 @@ function handleSound(directionEl: Element) {
 	if (tempo) {
 		const tempoEvent: TempoChangeEvent = {
 			type: 'tempo_change',
-			bpm: parseInt(tempo),
+			tempo: parseInt(tempo),
 			time: getParserContext<number>('noteOffset') ?? 0,
 			measure: getParserContext('measure')!
 		};
@@ -41,7 +41,7 @@ function handleWord(directionEl: Element) {
 	const wordsEl = directionEl.querySelector('words')!;
 	const ev: DirectionWordEvent = {
 		type: 'direction_word',
-		chord: wordsEl.textContent ?? '',
+		chord: wordsEl.innerHTML,
 		time: getParserContext<number>('noteOffset') ?? 0,
 		measure: getParserContext('measure')!
 	};

@@ -3,6 +3,7 @@
 	import { analyzer, gainNode } from '$lib/mic';
 	import * as Tone from 'tone';
 	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	$: bufferLength = $analyzer ? $analyzer.frequencyBinCount : 0;
 	$: dataArray = new Uint8Array(bufferLength);
 
@@ -24,5 +25,8 @@
 	{dataArray}
 </div>
 <div class="bg-red-50 h-[50%]">
-	<Spectogram {dataArray}></Spectogram>
+	{#if browser}
+		<!-- content here -->
+		<Spectogram {dataArray}></Spectogram>
+	{/if}
 </div>

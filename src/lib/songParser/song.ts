@@ -2,7 +2,7 @@ import type { NoteType } from '$lib/notes';
 import { handleAttributes } from './handlers/attributeHandlers';
 import { handleDirection } from './handlers/directionHandler';
 import { handleNote } from './handlers/noteHandler';
-import { measureDuration } from './utils';
+import { elDuration } from './utils';
 import * as Tone from 'tone';
 
 export type Pitch = {
@@ -61,7 +61,7 @@ export type FingerTech = {
 
 export type TempoChangeEvent = BaseEvent & {
 	type: 'tempo_change';
-	bpm: number;
+	tempo: number;
 };
 export type DirectionWordEvent = BaseEvent & {
 	type: 'direction_word';
@@ -129,67 +129,42 @@ export const pushEvent = (event: MusicEventWithMaybeMeasure) => {
 };
 
 export class Song {
-	_title: string | undefined;
-	_artist: string | undefined;
-	_parts: SongPart[] = [];
+	parts: SongPart[] = [];
 	doc: Document;
 
 	constructor(protected musicXML: string) {
 		this.doc = new DOMParser().parseFromString(musicXML, 'text/xml');
-		this.init();
 		console.log(this.doc);
-	}
-
-	initializedBaseAttr = false;
-	initBaseAttributes(): void {
-		if (this.initializedBaseAttr) {
-			return;
-		}
-		this.initializedBaseAttr = true;
-
-		// Get artist and title
-		const workTitle = this.doc.querySelector('work work-title');
-		if (workTitle) {
-			this._title = workTitle.innerHTML;
-		}
-
-		const identificationCreator = this.doc.querySelector('identification creator');
-		if (identificationCreator) {
-			this._artist = identificationCreator.innerHTML;
-		}
-
-		if (this._artist == undefined) {
-			this._artist = 'unknown';
-		}
-		if (this._title == undefined) {
-			this._title = 'unknown';
-		}
-
 		// Get parts
 		const partsList = this.doc.querySelectorAll('part-list score-part');
 		for (const partNameObj of partsList) {
-			this._parts.push({
+			this.parts.push({
 				id: partNameObj.getAttribute('id') ?? 'unknown',
 				name: partNameObj.querySelector('part-name')?.innerHTML ?? 'unknown',
 				measures: []
 			});
 		}
+		// Init parts
+		this.parts.forEach((part) => {
+			this._initPart(part.id);
+		});
 	}
 
-	init() {
-		this.initBaseAttributes();
-		for (const part of this._parts) {
-			this.initPart(part.id);
-		}
+	get artist(): string {
+		return this.doc.querySelector('work work-title')?.innerHTML ?? 'unknown';
 	}
 
-	initPart(id: string): void {
+	get title(): string {
+		return this.doc.querySelector('identification creator')?.innerHTML ?? 'unknown';
+	}
+
+	_initPart(id: string): void {
 		// If already initialized, return
-		if (this._parts.find((part) => part.id == id)?.measures.length != 0) {
+		if (this.parts.find((part) => part.id == id)?.measures.length != 0) {
 			return;
 		}
 
-		const thisPart = this._parts.find((part) => part.id == id);
+		const thisPart = this.parts.find((part) => part.id == id);
 		const partEl = this.doc.querySelector(`part[id="${id}"]`);
 		if (thisPart == undefined || partEl == null) {
 			console.log('Failed to find part');
@@ -242,8 +217,8 @@ export class Song {
 				} else if (child.tagName == 'barline') {
 					// Ignore
 				} else {
-					console.log('Unknown ROOT child type', child.tagName);
-					console.log(child);
+					// console.log('Unknown ROOT child type', child.tagName);
+					// console.log(child);
 				}
 			}
 			const measureT: number = getParserContext('measureTime')!;
@@ -256,7 +231,7 @@ export class Song {
 				if (chord) {
 					continue;
 				}
-				const duration = parseInt(noteEl.querySelector('duration')?.textContent ?? '0') / 1000;
+				const duration = elDuration(noteEl);
 				measureDurationSec += duration;
 			}
 
@@ -266,99 +241,52 @@ export class Song {
 
 		_currentContext = new Map<string, unknown>();
 	}
+}
 
-	artist(): string {
-		this.initBaseAttributes();
-		return this._artist ?? 'unknown';
+export function getSongPartEventRawTimed(songP: SongPart): [number, MusicEvent][] {
+	const measuresArr = songP?.measures ?? [];
+	const allEvents: MusicEvent[] = measuresArr.flatMap((m) => m.events);
+	const ret: [number, MusicEvent][] = [];
+	for (const musicEvent of allEvents) {
+		const baseT = musicEvent.measure.time + musicEvent.time;
+		ret.push([baseT, musicEvent]);
 	}
+	// ret.sort((a, b) => a[0] - b[0]);
 
-	title(): string {
-		this.initBaseAttributes();
-		return this._title ?? 'unknown';
-	}
+	return ret;
+}
 
-	partsInfo(): { id: string; name: string }[] {
-		this.initBaseAttributes();
-		return this._parts;
-	}
-
-	part(id: string) {
-		this.initBaseAttributes();
-		const thisPart = this._parts.find((part) => part.id == id);
-		if (thisPart == undefined) {
-			console.log('Part not found');
-			return;
+export async function playSongPart(songPart: SongPart) {
+	const measuresArr = songPart.measures ?? [];
+	const synth = new Tone.PolySynth(Tone.Synth, {
+		volume: -8,
+		oscillator: {
+			type: 'amtriangle20'
+		},
+		portamento: 0,
+		detune: 0,
+		envelope: {
+			attack: 0.01,
+			decay: 0.2,
+			release: 1,
+			sustain: 0
 		}
+	}).toDestination();
 
-		if (thisPart.measures.length == 0) {
-			this.initPart(id);
-		}
-		return thisPart;
-	}
-
-	getPartMusicEventsRawTimed(partId: string): [number, MusicEvent][] {
-		this.initPart(partId);
-		const measure = this.part(partId);
-		if (!measure) {
-			console.log('No part found');
-			return [];
-		}
-
-		const measuresArr = measure?.measures ?? [];
-		const allEvents: MusicEvent[] = measuresArr.flatMap((m) => m.events);
-		const ret: [number, MusicEvent][] = [];
-		for (const musicEvent of allEvents) {
+	const allEvents: MusicEvent[] = measuresArr.flatMap((m) => m.events);
+	Tone.Transport.loop = false;
+	const songPlayback = new Tone.ToneEvent((time, ev) => {
+		for (const musicEvent of ev) {
 			const baseT = musicEvent.measure.time + musicEvent.time;
-			ret.push([baseT, musicEvent]);
-		}
-		// ret.sort((a, b) => a[0] - b[0]);
 
-		return ret;
-	}
-
-	async playSong(partId: string) {
-		const measure = this.part(partId);
-		if (!measure) {
-			console.log('No part found');
-			return;
-		}
-		const measuresArr = measure?.measures ?? [];
-		const synth = new Tone.PolySynth(Tone.Synth, {
-			volume: -8,
-			oscillator: {
-				type: 'amtriangle20'
-			},
-			portamento: 0,
-			detune: 0,
-			envelope: {
-				attack: 0.01,
-				decay: 0.2,
-				release: 1,
-				sustain: 0
+			if (musicEvent.type === 'note_play') {
+				const duration = musicEvent.duration;
+				const pitch = pitchToString(musicEvent.pitch);
+				synth?.triggerAttackRelease(pitch, duration, baseT);
 			}
-		}).toDestination();
+		}
+	}, allEvents);
 
-		const allEvents: MusicEvent[] = measuresArr.flatMap((m) => m.events);
-		Tone.Transport.loop = false;
-		const songPlayback = new Tone.ToneEvent((time, ev) => {
-			for (const musicEvent of ev) {
-				const baseT = musicEvent.measure.time + musicEvent.time;
-
-				if (musicEvent.type === 'rest') {
-					//
-				} else if (musicEvent.type === 'signature_change') {
-					// Tone.Transport.timeSignature = [musicEvent.nBeats, musicEvent.beatType];
-				} else if (musicEvent.type === 'tempo_change') {
-					Tone.Transport.bpm.setValueAtTime(musicEvent.bpm, baseT);
-				} else if (musicEvent.type === 'note_play') {
-					const duration = musicEvent.duration;
-					const pitch = pitchToString(musicEvent.pitch);
-					synth?.triggerAttackRelease(pitch, duration, baseT);
-				}
-			}
-		}, allEvents);
-
-		songPlayback.start();
-		console.log('Now playing:', this.title());
-	}
+	songPlayback.start();
+	console.log('Playing song');
 }

@@ -18,8 +18,14 @@ export function handleAttributes(attrEl: Element) {
 }
 
 function handleTime(timeEl: Element) {
-	const beatsAttr = timeEl.querySelector('beats')?.textContent ?? '4';
-	const beatTypeAttr = timeEl.querySelector('beat-type')?.textContent ?? '4';
+	const beatsEl = timeEl.querySelector('beats');
+	const beatTypeEl = timeEl.querySelector('beat-type');
+	if (!beatsEl || !beatTypeEl) {
+		console.log('Invalid time signature');
+		return;
+	}
+	const beatsAttr = beatsEl.innerHTML;
+	const beatTypeAttr = beatTypeEl.innerHTML;
 	setParserContext('timeSig', {
 		nBeats: parseInt(beatsAttr),
 		beatType: parseInt(beatTypeAttr)

@@ -33,8 +33,6 @@
 	$: lineBuf8 = new Uint8ClampedArray(lineBuf);
 	$: lineImgData = new ImageData(lineBuf8, height, 1); // 1 line of canvas pixels
 
-	$: clearBuf = new ArrayBuffer(height * width * 4); // fills with 0s ie. rgba 0,0,0,0 = transparent
-	$: clearBuf8 = new Uint8ClampedArray(clearBuf);
 	$: blankBuf = new ArrayBuffer(height * 4);
 	$: blankBuf8 = new Uint8ClampedArray(blankBuf);
 	$: blankImgData = new ImageData(blankBuf8, height, 1);

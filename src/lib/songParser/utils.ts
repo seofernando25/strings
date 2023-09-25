@@ -1,3 +1,5 @@
+import { getParserContext } from './song';
+
 export function childrenHasTag(el: Element, tagName: string): 'no' | 'one' | 'many' {
 	let count = 0;
 	for (const child of el.children) {
@@ -40,4 +42,12 @@ export function runSelectors(
 	}
 
 	return selectorAny;
+}
+
+export function elDuration(el: Element) {
+	return (
+		(parseInt(el.querySelector('duration')?.textContent ?? '0') *
+			(60 / getParserContext<number>('tempo')!)) /
+		1000
+	);
 }
