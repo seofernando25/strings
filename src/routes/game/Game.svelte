@@ -12,16 +12,15 @@
 
 	import audio from '$lib/assets/music.m4a?url';
 	import { Text } from '@threlte/extras';
-	import { audioContextStarted } from '$lib/mic/audioContext';
 	import { tweened } from 'svelte/motion';
 	function degToRad(deg: number) {
 		return (deg * Math.PI) / 180;
 	}
 
 	// 1 to 26 generator
-	let frets = Array.from({ length: 26 }, (_, i) => i).filter((i) => i !== 0);
-	let guitarScale = 50;
-	let noteSpeed = 50;
+	const frets = Array.from({ length: 26 }, (_, i) => i).filter((i) => i !== 0);
+	const guitarScale = 50;
+	const noteSpeed = 50;
 
 	/**
 	 * Returns guitar fret ratios
@@ -75,12 +74,6 @@
 		][];
 
 		console.log(rawNotes);
-
-		audioContextStarted.subscribe((started) => {
-			if (started) {
-				console.log('Playing song', audio);
-			}
-		});
 
 		setInterval(() => {
 			songPlaybackTime = 1.9 + (player?.currentTime ?? 0);

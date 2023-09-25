@@ -3,7 +3,7 @@
 	import Game from './Game.svelte';
 	import { Song } from '$lib/songParser/song';
 	import score from '$lib/assets/music.xml?raw';
-	import { browser } from '@tensorflow/tfjs';
+	import { browser } from '$app/environment';
 
 	let song: Song = new Song(score);
 	let partId: string = 'P1';
@@ -13,7 +13,7 @@
 </script>
 
 <header class="bg-gray-800 text-white py-4 px-8 flex justify-between items-center">
-	<h1 class="text-2xl font-bold">{song?.title} by {song?.artist}</h1>
+	<h1 class="text-2xl font-bold">{song.title} by {song.artist}</h1>
 	{#if song}
 		{#if song.parts ?? 0 > 0}
 			<select bind:value={partId} class="select select-bordered w-full max-w-xs ml-4">

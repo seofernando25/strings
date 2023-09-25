@@ -1,15 +1,15 @@
 <script lang="ts">
 	import Spectogram from '$lib/components/Spectogram.svelte';
 	import { analyzer, gainNode } from '$lib/mic';
-	import * as Tone from 'tone';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	$: bufferLength = $analyzer ? $analyzer.frequencyBinCount : 0;
 	$: dataArray = new Uint8Array(bufferLength);
 
 	onMount(async () => {
+		const tone = await import('tone');
 		let node = $gainNode;
-		let audioCtx = Tone.getContext();
+		let audioCtx = tone.getContext();
 		if (!node) return;
 		if (!audioCtx) return;
 

@@ -2,10 +2,9 @@
 	import { audioContextStarted } from '$lib/mic/audioContext';
 	import { onMount } from 'svelte';
 	import '../app.postcss';
-	import * as Tone from 'tone';
 
 	async function initializeTone() {
-		await Tone.start();
+		await tone.start();
 		audioContextStarted.set(true);
 	}
 

@@ -2,7 +2,6 @@
 	import score from '$lib/assets/music.xml?raw';
 	import {
 		Song,
-		pitchToString,
 		type MusicEvent,
 		getSongPartEventRawTimed,
 		playSongPart
@@ -12,7 +11,6 @@
 	import * as Tone from 'tone';
 	import { browser } from '$app/environment';
 	import { tweened } from 'svelte/motion';
-	import { Clock } from 'three';
 	import { SongClock } from '$lib/songParser/songclock';
 
 	let synth: Tone.PolySynth | null = null;
@@ -34,12 +32,6 @@
 		setInterval(() => {
 			songPlaybackTime += songClock?.getDelta() ?? 0;
 		}, 10);
-
-		if (crossOriginIsolated) {
-			console.log('crossOriginIsolated');
-		} else {
-			console.log('not crossOriginIsolated');
-		}
 
 		audioContextStarted.subscribe((started) => {
 			console.log('Audio Context Changed');

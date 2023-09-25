@@ -1,14 +1,12 @@
-import { noteStringToNoteLength, type NoteType } from '$lib/notes';
 import {
 	getParserContext,
 	pushEvent,
 	type Pitch,
 	type RestEvent,
 	type NotePlayEvent,
-	setParserContext,
-	type TimeMeasure
+	setParserContext
 } from '../song';
-import { elDuration, measureDuration, runSelectors } from '../utils';
+import { elDuration, runSelectors } from '../utils';
 
 export function handleNote(noteEl: Element) {
 	const selectors: [string[], (el: Element) => unknown][] = [

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { micList, analyzer, preferredMic, gainNode } from '$lib/mic';
+	import { analyzer, gainNode } from '$lib/mic';
 	import { pitches } from '$lib/detection/model';
 	import Waveform from '$lib/components/Waveform.svelte';
 	import { noteToFreqSimple, type Note, type ChromaticNote } from '$lib/notes';
