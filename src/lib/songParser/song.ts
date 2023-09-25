@@ -137,6 +137,7 @@ export class Song {
 	constructor(protected musicXML: string) {
 		this.doc = new DOMParser().parseFromString(musicXML, 'text/xml');
 		this.init();
+		console.log(this.doc);
 	}
 
 	initializedBaseAttr = false;
@@ -211,6 +212,7 @@ export class Song {
 			beatType: 4
 		});
 
+		let measureStart = 0;
 		// Get all measures
 		const measures = partEl.querySelectorAll('measure');
 		for (const measureEl of measures) {
@@ -218,7 +220,7 @@ export class Song {
 
 			thisPart.measures.push({
 				events: [],
-				time: getParserContext('measureTime')!
+				time: measureStart
 			});
 			setParserContext('measure', thisPart.measures[thisPart.measures.length - 1]);
 
@@ -242,11 +244,16 @@ export class Song {
 					console.log(child);
 				}
 			}
-			const measureDurationSec = measureDuration(
-				getParserContext('tempo')! ?? 120,
-				getParserContext<TimeMeasure>('timeSig')!.nBeats ?? 4
-			);
-
+			let measureDurationSec = 0;
+			// For all notes, add the duration to the measure time
+			const notesEls = measureEl.querySelectorAll('note');
+			for (const noteEl of notesEls) {
+				const duration = noteEl.querySelector('duration')?.textContent ?? '0';
+				const durationNum = parseInt(duration);
+				measureDurationSec += durationNum;
+			}
+			measureDurationSec /= 1000;
+			measureStart += measureDurationSec;
 			const measureT: number = getParserContext('measureTime') ?? 0;
 			setParserContext('measureTime', measureDurationSec + measureT);
 		}
@@ -294,10 +301,12 @@ export class Song {
 		const measuresArr = measure?.measures ?? [];
 		const allEvents: MusicEvent[] = measuresArr.flatMap((m) => m.events);
 		const ret: [number, MusicEvent][] = [];
+		console.log(allEvents);
 		for (const musicEvent of allEvents) {
 			const baseT = musicEvent.measure.time + musicEvent.time;
 			ret.push([baseT, musicEvent]);
 		}
+		// ret.sort((a, b) => a[0] - b[0]);
 
 		return ret;
 	}

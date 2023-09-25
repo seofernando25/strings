@@ -50,9 +50,7 @@ function handleSingleNote(noteEl: Element) {
 
 	// TODO: Quadruple check this
 	// Convert note duration to seconds
-	const duration = calculateDuration(
-		parseInt(noteEl.querySelector('duration')?.textContent ?? '0')
-	);
+	const duration = parseInt(noteEl.querySelector('duration')?.textContent ?? '0') / 1000;
 	const noteEvent: NotePlayEvent = {
 		type: 'note_play',
 		pitch,
@@ -69,7 +67,8 @@ function handleSingleNote(noteEl: Element) {
 
 function handleRest(noteEl: Element) {
 	const restDuration = noteEl.querySelector('duration')!;
-	const restDurationSeconds = calculateDuration(parseInt(restDuration.textContent ?? '0'));
+	// const restDurationSeconds = calculateDuration(parseInt(restDuration.textContent ?? '0'));
+	const restDurationSeconds = parseInt(restDuration.textContent ?? '1') / 1000;
 	// Get note offset
 	const noteOffset = getParserContext<number>('noteOffset') ?? 0;
 	const restEvent: RestEvent = {
@@ -89,10 +88,11 @@ function handleChord(noteEl: Element) {
 	const noteEvent: NotePlayEvent = {
 		type: 'note_play',
 		pitch,
+		fingerTech: getFingerTech(noteEl),
 		// Chords are not affected by the note offset of the last non-chord note
 		// https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/chord/
 		time: getParserContext<number>('lastNonChordOffset') ?? 0,
-		duration: parseInt(noteEl.querySelector('duration')?.textContent ?? '0'),
+		duration: parseInt(noteEl.textContent ?? '1') / 1000,
 		measure: getParserContext('measure')!
 	};
 	pushEvent(noteEvent);
@@ -113,13 +113,13 @@ function fetchPitch(pitchEl: Element): Pitch {
 	};
 }
 
-function calculateDuration(nBeats: number) {
-	const bpm = getParserContext<number>('tempo') ?? 120;
-	const spb = 60 / bpm;
-	const timeSig = getParserContext<TimeMeasure>('timeSig') ?? { nBeats: 4, beatType: 4 };
-	const measureLength = spb * timeSig.nBeats;
-	const beatsInMeasure = timeSig.nBeats * timeSig.beatType;
-	const beatNorm = nBeats / beatsInMeasure;
-	const totalLength = measureLength * beatNorm;
-	return totalLength;
-}
+// function calculateDuration(nBeats: number) {
+// 	const bpm = getParserContext<number>('tempo') ?? 120;
+// 	const spb = 60 / bpm;
+// 	const timeSig = getParserContext<TimeMeasure>('timeSig') ?? { nBeats: 4, beatType: 4 };
+// 	const measureLength = spb * timeSig.nBeats;
+// 	const beatsInMeasure = timeSig.nBeats * timeSig.beatType;
+// 	const beatNorm = nBeats / beatsInMeasure;
+// 	const totalLength = measureLength * beatNorm;
+// 	return totalLength;
+// }

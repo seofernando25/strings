@@ -6,8 +6,8 @@
 	import { onMount } from 'svelte';
 	import { Song } from '$lib/songParser/song';
 	import type { MusicEvent, NotePlayEvent } from '$lib/songParser/song';
-	import score from '$lib/assets/trap.xml?raw';
-
+	import score from '$lib/assets/music.xml?raw';
+	import { Text } from '@threlte/extras';
 	function degToRad(deg: number) {
 		return (deg * Math.PI) / 180;
 	}
@@ -38,27 +38,26 @@
 		NotePlayEvent
 	][];
 	let songPlaybackTime = 0;
-	let timed = [] as [number, MusicEvent][];
 	onMount(async () => {
 		song = new Song(score);
 		rawTimings = song.getPartMusicEventsRawTimed('P1');
-		songClock.setTimeline(rawTimings);
-		const notes = rawTimings.filter(([t, event]) => event.type === 'note_play') as [
+		// console.log(rawTs);
+		// songClock.setTimeline(rawTimings);
+		rawNotes = rawTimings.filter(([t, event]) => event.type === 'note_play') as [
 			number,
 			NotePlayEvent
 		][];
-		const notesWithoutFingerTech = notes.filter(([t, event]) => !event.fingerTech);
-		console.log(notesWithoutFingerTech);
 
-		// songClock.setTimeline(song.getPartMusicEventsRawTimed('P1'));
+		console.log(song);
+
+		songClock.setTimeline(song.getPartMusicEventsRawTimed('P1'));
 
 		// songClock.addEventListener(({ time, event, remaining }) => {
 		// 	songPlaybackTime = time;
-		// 	timed = remaining;
 		// });
 
 		setInterval(() => {
-			songPlaybackTime += 0.06;
+			songPlaybackTime += 0.016;
 		}, 16);
 
 		songClock.start();
@@ -90,17 +89,28 @@
 		<T.CapsuleGeometry args={[0.1, 5, 6, 9]} />
 		<T.MeshStandardMaterial color={GRAY} />
 	</T.Mesh>
+
+	<!-- Text -->
+	<Text
+		text={fret.toString()}
+		position={[fret + 0.5, 3.5, 0.3]}
+		fontSize={0.5}
+		textAlign="center"
+		fontWeight={900}
+		characters={'0123456789'}
+		sdfGlyphSize={64}
+	/>
 {/each}
 
 <!-- Notes for now just make a line of rectangle notes in the z direction -->
 {#each rawNotes as [t, event], i}
 	<T.Mesh
-		position.z={-t + songPlaybackTime}
-		position.y={event.fingerTech?.string ? 6 - (event.fingerTech?.string ?? 0) : 10}
-		position.x={event.fingerTech?.fret ? event.fingerTech?.fret ?? 0 : -1}
+		position.z={(-t + songPlaybackTime) * 50}
+		position.y={event.fingerTech?.string ? event.fingerTech?.string ?? 0 : 10}
+		position.x={event.fingerTech?.fret ? 0.5 + event.fingerTech?.fret ?? 0 : -1}
 	>
-		<T.BoxGeometry args={[1, 0.5, 0.4]} />
-		<T.MeshStandardMaterial color={STRING_COLORS[event.fingerTech?.string ?? 0]} />
+		<T.BoxGeometry args={[event.fingerTech?.fret === 0 ? 10 : 1, 0.5, 0.4]} />
+		<T.MeshStandardMaterial color={STRING_COLORS[6 - (event.fingerTech?.string ?? 0)]} />
 	</T.Mesh>
 {/each}
 

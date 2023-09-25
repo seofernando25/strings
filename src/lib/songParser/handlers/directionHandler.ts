@@ -9,8 +9,8 @@ import { runSelectors } from '../utils';
 
 export function handleDirection(directionEl: Element) {
 	const selectors: [string[], (el: Element) => unknown][] = [
-		[['sound'], handleSound],
-		[['direction-type', 'words'], handleWord]
+		[['direction-type', 'words'], handleWord],
+		[['sound'], handleSound]
 	];
 
 	// Handle selectors
