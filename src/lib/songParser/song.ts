@@ -148,14 +148,16 @@ export class Song {
 		this.initializedBaseAttr = true;
 
 		// Get artist and title
-		const credits = this.doc.querySelectorAll('credit');
-		for (const credit of credits) {
-			if ((credit.querySelector('credit-type')?.textContent ?? '') === 'composer') {
-				this._artist = credit.querySelector('credit-words')?.innerHTML ?? 'unknown';
-			} else if ((credit.querySelector('credit-type')?.textContent ?? '') === 'title') {
-				this._title = credit.querySelector('credit-words')?.innerHTML ?? 'unknown';
-			}
+		const workTitle = this.doc.querySelector('work work-title');
+		if (workTitle) {
+			this._title = workTitle.innerHTML;
 		}
+
+		const identificationCreator = this.doc.querySelector('identification creator');
+		if (identificationCreator) {
+			this._artist = identificationCreator.innerHTML;
+		}
+
 		if (this._artist == undefined) {
 			this._artist = 'unknown';
 		}
@@ -212,7 +214,6 @@ export class Song {
 			beatType: 4
 		});
 
-		let measureStart = 0;
 		// Get all measures
 		const measures = partEl.querySelectorAll('measure');
 		for (const measureEl of measures) {
@@ -220,8 +221,9 @@ export class Song {
 
 			thisPart.measures.push({
 				events: [],
-				time: measureStart
+				time: getParserContext('measureTime') ?? 0
 			});
+
 			setParserContext('measure', thisPart.measures[thisPart.measures.length - 1]);
 
 			setParserContext('noteOffset', 0);
@@ -244,18 +246,22 @@ export class Song {
 					console.log(child);
 				}
 			}
+			const measureT: number = getParserContext('measureTime')!;
+
 			let measureDurationSec = 0;
-			// For all notes, add the duration to the measure time
 			const notesEls = measureEl.querySelectorAll('note');
 			for (const noteEl of notesEls) {
-				const duration = noteEl.querySelector('duration')?.textContent ?? '0';
-				const durationNum = parseInt(duration);
-				measureDurationSec += durationNum;
+				// Check if chord
+				const chord = noteEl.querySelector('chord');
+				if (chord) {
+					continue;
+				}
+				const duration = parseInt(noteEl.querySelector('duration')?.textContent ?? '0') / 1000;
+				measureDurationSec += duration;
 			}
-			measureDurationSec /= 1000;
-			measureStart += measureDurationSec;
-			const measureT: number = getParserContext('measureTime') ?? 0;
-			setParserContext('measureTime', measureDurationSec + measureT);
+
+			// const measureDurationSec = measureDuration(getParserContext('tempo')!, timeSig.nBeats);
+			setParserContext('measureTime', measureT + measureDurationSec);
 		}
 
 		_currentContext = new Map<string, unknown>();
@@ -301,7 +307,6 @@ export class Song {
 		const measuresArr = measure?.measures ?? [];
 		const allEvents: MusicEvent[] = measuresArr.flatMap((m) => m.events);
 		const ret: [number, MusicEvent][] = [];
-		console.log(allEvents);
 		for (const musicEvent of allEvents) {
 			const baseT = musicEvent.measure.time + musicEvent.time;
 			ret.push([baseT, musicEvent]);

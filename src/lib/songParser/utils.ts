@@ -8,9 +8,8 @@ export function childrenHasTag(el: Element, tagName: string): 'no' | 'one' | 'ma
 	return 'one';
 }
 
-export function measureDuration(bpm: number, nBeats: number) {
-	const spb = 60 / bpm;
-	return spb * nBeats;
+export function measureDuration(tempo: number, nBeats: number) {
+	return nBeats / (tempo / 60);
 }
 
 export function runSelectors(

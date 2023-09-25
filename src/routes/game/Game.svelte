@@ -5,7 +5,7 @@
 	import { SongClock } from '$lib/songParser/songclock';
 	import { onMount } from 'svelte';
 	import { Song } from '$lib/songParser/song';
-	import type { MusicEvent, NotePlayEvent } from '$lib/songParser/song';
+	import type { MusicEvent, NotePlayEvent, SongPart } from '$lib/songParser/song';
 	import score from '$lib/assets/music.xml?raw';
 	import { Text } from '@threlte/extras';
 	function degToRad(deg: number) {
@@ -33,6 +33,7 @@
 	let songClock: SongClock = new SongClock();
 	let song: Song | null = null;
 	let rawTimings: [number, MusicEvent][] = [];
+	let part: SongPart | undefined;
 	$: rawNotes = rawTimings.filter(([t, event]) => event.type === 'note_play') as [
 		number,
 		NotePlayEvent
@@ -40,14 +41,15 @@
 	let songPlaybackTime = 0;
 	onMount(async () => {
 		song = new Song(score);
+		part = song.part('P1');
+
 		rawTimings = song.getPartMusicEventsRawTimed('P1');
-		// console.log(rawTs);
-		// songClock.setTimeline(rawTimings);
 		rawNotes = rawTimings.filter(([t, event]) => event.type === 'note_play') as [
 			number,
 			NotePlayEvent
 		][];
 
+		// 14.4
 		console.log(song);
 
 		songClock.setTimeline(song.getPartMusicEventsRawTimed('P1'));
@@ -118,3 +120,21 @@
 	<T.CapsuleGeometry args={[0.2, 6, 7, 10]} />
 	<T.MeshStandardMaterial color={[1, 1, 1]} />
 </T.Mesh>
+
+<!-- Print each measure start -->
+{#if part}
+	{#each part.measures as measure, i}
+		{measure.time}
+		<Text
+			text={i.toString()}
+			position.z={(-measure.time + songPlaybackTime) * 50}
+			position.y={5}
+			position.x={0}
+			fontSize={0.5}
+			textAlign="center"
+			fontWeight={900}
+			characters={'0123456789'}
+			sdfGlyphSize={64}
+		/>
+	{/each}
+{/if}

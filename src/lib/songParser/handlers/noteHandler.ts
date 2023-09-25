@@ -4,8 +4,7 @@ import {
 	type Pitch,
 	type RestEvent,
 	type NotePlayEvent,
-	setParserContext,
-	type TimeMeasure
+	setParserContext
 } from '../song';
 import { runSelectors } from '../utils';
 
@@ -67,8 +66,14 @@ function handleSingleNote(noteEl: Element) {
 
 function handleRest(noteEl: Element) {
 	const restDuration = noteEl.querySelector('duration')!;
+
+	const restDurationText = restDuration.textContent;
+	if (restDurationText === null) {
+		console.log("Didn't find rest duration");
+		return;
+	}
 	// const restDurationSeconds = calculateDuration(parseInt(restDuration.textContent ?? '0'));
-	const restDurationSeconds = parseInt(restDuration.textContent ?? '1') / 1000;
+	const restDurationSeconds = parseInt(restDurationText) / 1000;
 	// Get note offset
 	const noteOffset = getParserContext<number>('noteOffset') ?? 0;
 	const restEvent: RestEvent = {
@@ -85,6 +90,14 @@ function handleRest(noteEl: Element) {
 function handleChord(noteEl: Element) {
 	const pitch = fetchPitch(noteEl.querySelector('pitch')!);
 
+	const durationEl = noteEl.querySelector('duration')!;
+	const restDurationText = durationEl.textContent;
+	if (restDurationText === null) {
+		console.log("Didn't find rest duration");
+		return;
+	}
+	const duration = parseInt(restDurationText) / 1000;
+
 	const noteEvent: NotePlayEvent = {
 		type: 'note_play',
 		pitch,
@@ -92,7 +105,7 @@ function handleChord(noteEl: Element) {
 		// Chords are not affected by the note offset of the last non-chord note
 		// https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/chord/
 		time: getParserContext<number>('lastNonChordOffset') ?? 0,
-		duration: parseInt(noteEl.textContent ?? '1') / 1000,
+		duration: duration,
 		measure: getParserContext('measure')!
 	};
 	pushEvent(noteEvent);
@@ -100,11 +113,8 @@ function handleChord(noteEl: Element) {
 
 function fetchPitch(pitchEl: Element): Pitch {
 	const step = pitchEl.querySelector('step')?.textContent ?? 'C';
-	if (!step) throw new Error('Missing step');
 	const octave = pitchEl.querySelector('octave')?.textContent ?? '4';
-	if (!octave) throw new Error('Missing octave');
 	const alter = pitchEl.querySelector('alter')?.textContent ?? '0';
-	if (!alter) throw new Error('Missing alter');
 
 	return {
 		step: step as Pitch['step'],
@@ -112,14 +122,3 @@ function fetchPitch(pitchEl: Element): Pitch {
 		alter: parseInt(alter)
 	};
 }
-
-// function calculateDuration(nBeats: number) {
-// 	const bpm = getParserContext<number>('tempo') ?? 120;
-// 	const spb = 60 / bpm;
-// 	const timeSig = getParserContext<TimeMeasure>('timeSig') ?? { nBeats: 4, beatType: 4 };
-// 	const measureLength = spb * timeSig.nBeats;
-// 	const beatsInMeasure = timeSig.nBeats * timeSig.beatType;
-// 	const beatNorm = nBeats / beatsInMeasure;
-// 	const totalLength = measureLength * beatNorm;
-// 	return totalLength;
-// }
