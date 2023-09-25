@@ -23,7 +23,7 @@
 
 {#if !$audioContextStarted}
 	<button
-		class="fixed inset-0 flex items-center justify-center text-4xl md:text-6xl lg:text-7xl text-center font-bold text-white bg-gray-900 bg-opacity-70"
+		class="z-50 fixed inset-0 flex items-center justify-center text-4xl md:text-6xl lg:text-7xl text-center font-bold text-white bg-gray-900 bg-opacity-70"
 		on:click={initializeTone}
 		on:keydown={handleKeyDown}
 	>
@@ -36,6 +36,7 @@
 		<div class="flex-1 gap-2">
 			<a class="btn btn-ghost normal-case text-xl" href="/">SStrings</a>
 			<a class="btn btn-ghost normal-case text-xl" href="/tuner">Tuner</a>
+			<a class="btn btn-ghost normal-case text-xl" href="/game">Game</a>
 		</div>
 		<div class="flex-none gap-2">
 			<a href="/settings" class="btn btn-outline">⚙️</a>

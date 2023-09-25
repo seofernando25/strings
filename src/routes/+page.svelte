@@ -6,18 +6,37 @@
 	import * as Tone from 'tone';
 	import { browser } from '$app/environment';
 	import { tweened } from 'svelte/motion';
+	import { Clock } from 'three';
+	import { SongClock } from '$lib/songParser/songclock';
 
 	let synth: Tone.PolySynth | null = null;
 	let song: Song | null = null;
+
+	$: timed = [] as [number, MusicEvent][];
+	let songClock: SongClock = new SongClock();
+	// Only show events that have happened after the current time slice 10
+	$: songPlaybackTime = 0;
 	onMount(async () => {
 		song = new Song(score);
+		songClock.setTimeline(song.getPartMusicEventsRawTimed('P1'));
+
+		songClock.addEventListener(({ time, event, remaining }) => {
+			songPlaybackTime = time;
+			timed = remaining;
+		});
+
+		setInterval(() => {
+			songPlaybackTime += songClock?.getDelta() ?? 0;
+		}, 10);
+
+		songClock.start();
+
 		if (crossOriginIsolated) {
 			console.log('crossOriginIsolated');
 		} else {
 			console.log('not crossOriginIsolated');
 		}
 
-		const part = song.part('P1');
 		audioContextStarted.subscribe((started) => {
 			console.log('Audio Context Changed');
 
@@ -42,7 +61,6 @@
 		});
 	});
 
-	let songPlayback: Tone.ToneEvent | null = null;
 	$: songPlaybackTimeDisplay = tweened(0, {
 		duration: 50,
 		easing: (t) => t * t
@@ -52,33 +70,11 @@
 	$: selected = 'P1';
 	$: songPart = song?.part(selected);
 	async function playSong() {
-		let measuresArr = songPart?.measures ?? [];
-
-		let allEvents: MusicEvent[] = measuresArr.flatMap((m) => m.events);
-		Tone.Transport.loop = false;
-		songPlayback = new Tone.ToneEvent((time, ev) => {
-			for (const musicEvent of ev) {
-				let baseT = musicEvent.measure.time + musicEvent.time;
-				Tone.Draw.schedule(function () {
-					songPlaybackTimeDisplay.set(baseT);
-				}, baseT);
-
-				if (musicEvent.type === 'rest') {
-					//
-				} else if (musicEvent.type === 'signature_change') {
-					// Tone.Transport.timeSignature = [musicEvent.nBeats, musicEvent.beatType];
-				} else if (musicEvent.type === 'tempo_change') {
-					Tone.Transport.bpm.setValueAtTime(musicEvent.bpm, baseT);
-				} else if (musicEvent.type === 'note_play') {
-					const duration = musicEvent.duration;
-					const pitch = pitchToString(musicEvent.pitch);
-					synth?.triggerAttackRelease(pitch, duration, baseT);
-				}
-			}
-		}, allEvents);
-
-		songPlayback.start();
-		console.log('Done Scheduling music');
+		const songPartMaybe = songPart;
+		if (!songPartMaybe) {
+			return;
+		}
+		song?.playSong(songPartMaybe.id);
 	}
 
 	let isPlaying = false;
@@ -98,14 +94,6 @@
 			console.log('destroyed');
 		}
 	});
-
-	function setPlaybackTime(desiredPlaybackTime: number) {
-		if (!songPlayback) {
-			return;
-		}
-		console.log('setPlaybackTime');
-		songPlayback.start(desiredPlaybackTime);
-	}
 </script>
 
 {#if song}
@@ -149,4 +137,31 @@
 			<div class="w-10">{eventT}</div>
 		</div>
 	{/each}
+</div>
+
+{songPlaybackTime}
+<!-- timed -->
+<div class="overflow-x-auto">
+	<table class="table">
+		<!-- head -->
+		<thead>
+			<tr>
+				<th></th>
+				<th>Time</th>
+				<th>Type</th>
+				<th></th>
+				<th></th>
+				<th></th>
+			</tr>
+		</thead>
+		<tbody>
+			{#each timed as event, i}
+				<tr>
+					<th>{i}</th>
+					<td>{event[0]}</td>
+					<td>{event[1].type}</td>
+				</tr>
+			{/each}
+		</tbody>
+	</table>
 </div>

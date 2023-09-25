@@ -3,6 +3,7 @@ import { handleAttributes } from './handlers/attributeHandlers';
 import { handleDirection } from './handlers/directionHandler';
 import { handleNote } from './handlers/noteHandler';
 import { measureDuration } from './utils';
+import * as Tone from 'tone';
 
 export type Pitch = {
 	step: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G'; // Note letter
@@ -52,6 +53,12 @@ export type SongPart = {
 	measures: Measure[];
 };
 
+export type FingerTech = {
+	fingering?: number;
+	string?: number;
+	fret?: number;
+};
+
 export type TempoChangeEvent = BaseEvent & {
 	type: 'tempo_change';
 	bpm: number;
@@ -64,6 +71,7 @@ export type NotePlayEvent = BaseEvent & {
 	type: 'note_play';
 	pitch: Pitch;
 	duration: number;
+	fingerTech: FingerTech | undefined;
 };
 export type RestEvent = BaseEvent & {
 	type: 'rest';
@@ -128,7 +136,7 @@ export class Song {
 
 	constructor(protected musicXML: string) {
 		this.doc = new DOMParser().parseFromString(musicXML, 'text/xml');
-		console.log(this.doc);
+		this.init();
 	}
 
 	initializedBaseAttr = false;
@@ -173,6 +181,11 @@ export class Song {
 	}
 
 	initPart(id: string): void {
+		// If already initialized, return
+		if (this._parts.find((part) => part.id == id)?.measures.length != 0) {
+			return;
+		}
+
 		const thisPart = this._parts.find((part) => part.id == id);
 		const partEl = this.doc.querySelector(`part[id="${id}"]`);
 		if (thisPart == undefined || partEl == null) {
@@ -268,5 +281,70 @@ export class Song {
 			this.initPart(id);
 		}
 		return thisPart;
+	}
+
+	getPartMusicEventsRawTimed(partId: string): [number, MusicEvent][] {
+		this.initPart(partId);
+		const measure = this.part(partId);
+		if (!measure) {
+			console.log('No part found');
+			return [];
+		}
+
+		const measuresArr = measure?.measures ?? [];
+		const allEvents: MusicEvent[] = measuresArr.flatMap((m) => m.events);
+		const ret: [number, MusicEvent][] = [];
+		for (const musicEvent of allEvents) {
+			const baseT = musicEvent.measure.time + musicEvent.time;
+			ret.push([baseT, musicEvent]);
+		}
+
+		return ret;
+	}
+
+	async playSong(partId: string) {
+		const measure = this.part(partId);
+		if (!measure) {
+			console.log('No part found');
+			return;
+		}
+		const measuresArr = measure?.measures ?? [];
+		const synth = new Tone.PolySynth(Tone.Synth, {
+			volume: -8,
+			oscillator: {
+				type: 'amtriangle20'
+			},
+			portamento: 0,
+			detune: 0,
+			envelope: {
+				attack: 0.01,
+				decay: 0.2,
+				release: 1,
+				sustain: 0
+			}
+		}).toDestination();
+
+		const allEvents: MusicEvent[] = measuresArr.flatMap((m) => m.events);
+		Tone.Transport.loop = false;
+		const songPlayback = new Tone.ToneEvent((time, ev) => {
+			for (const musicEvent of ev) {
+				const baseT = musicEvent.measure.time + musicEvent.time;
+
+				if (musicEvent.type === 'rest') {
+					//
+				} else if (musicEvent.type === 'signature_change') {
+					// Tone.Transport.timeSignature = [musicEvent.nBeats, musicEvent.beatType];
+				} else if (musicEvent.type === 'tempo_change') {
+					Tone.Transport.bpm.setValueAtTime(musicEvent.bpm, baseT);
+				} else if (musicEvent.type === 'note_play') {
+					const duration = musicEvent.duration;
+					const pitch = pitchToString(musicEvent.pitch);
+					synth?.triggerAttackRelease(pitch, duration, baseT);
+				}
+			}
+		}, allEvents);
+
+		songPlayback.start();
+		console.log('Now playing:', this.title());
 	}
 }

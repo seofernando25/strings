@@ -30,8 +30,23 @@ export function handleNote(noteEl: Element) {
 	}
 }
 
+function getFingerTech(noteEl: Element) {
+	const technical = noteEl.querySelector('technical');
+	const techFingering = technical?.querySelector('fingering')?.textContent;
+	const techString = technical?.querySelector('string')?.textContent;
+	const techFret = technical?.querySelector('fret')?.textContent;
+
+	const fingerTech = {
+		fingering: techFingering ? parseInt(techFingering) : undefined,
+		string: techString ? parseInt(techString) : undefined,
+		fret: techFret ? parseInt(techFret) : undefined
+	};
+	return fingerTech;
+}
+
 function handleSingleNote(noteEl: Element) {
 	const pitch = fetchPitch(noteEl.querySelector('pitch')!);
+	const fingerTech = getFingerTech(noteEl);
 
 	// TODO: Quadruple check this
 	// Convert note duration to seconds
@@ -43,7 +58,8 @@ function handleSingleNote(noteEl: Element) {
 		pitch,
 		time: getParserContext<number>('noteOffset') ?? 0,
 		duration,
-		measure: getParserContext('measure')!
+		measure: getParserContext('measure')!,
+		fingerTech
 	};
 
 	// Increase note offset
