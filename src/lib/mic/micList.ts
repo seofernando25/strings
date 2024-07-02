@@ -1,14 +1,15 @@
-import { browser } from '$app/environment';
-import { type Writable, writable } from 'svelte/store';
+import { signal } from '@preact/signals-core';
 
-export const micList: Writable<MediaDeviceInfo[]> = writable([]);
-export const hasMicPermission: Writable<boolean> = writable(false);
+export const micList = signal<MediaDeviceInfo[]>([]);
+export const hasMicPermission = signal<boolean | undefined>(undefined);
+
 
 export async function updateMicrophoneList() {
 	// Check if we are perhaps missing microphone permissions
 	try {
 		const micPerms = await navigator.permissions.query({ name: 'microphone' as PermissionName });
 		if (micPerms.state === 'denied') {
+			hasMicPermission.value = false;
 			console.log('Microphone permission denied');
 		}
 	} catch (error) {
@@ -19,13 +20,10 @@ export async function updateMicrophoneList() {
 
 	const devices = await navigator.mediaDevices.enumerateDevices();
 	const inputDevices = devices.filter((device) => device.kind === 'audioinput');
-	micList.set(inputDevices);
+	micList.value = inputDevices;
 }
 
-if (browser) {
-	updateMicrophoneList();
-	navigator.mediaDevices.removeEventListener('devicechange', updateMicrophoneList);
-	navigator.mediaDevices.addEventListener('devicechange', updateMicrophoneList);
-}
+updateMicrophoneList();
+navigator.mediaDevices.addEventListener('devicechange', updateMicrophoneList);
 
 export default micList;

@@ -12,10 +12,10 @@
 	import { browser } from '$app/environment';
 	import { tweened } from 'svelte/motion';
 	import { SongClock } from '$lib/songParser/songclock';
+	import { effect } from '@preact/signals-core';
 
 	let synth: Tone.PolySynth | null = null;
 	let song: Song | null = null;
-
 	$: timed = [] as [number, MusicEvent][];
 	let songClock: SongClock = new SongClock();
 	// Only show events that have happened after the current time slice 10
@@ -33,11 +33,11 @@
 			songPlaybackTime += songClock?.getDelta() ?? 0;
 		}, 10);
 
-		audioContextStarted.subscribe((started) => {
+		effect(() => {
 			console.log('Audio Context Changed');
 
-			console.log(started);
-			if (started) {
+			const started = audioContextStarted.value;
+			if (!started) {
 				Tone.Transport.start();
 				synth = new Tone.PolySynth(Tone.Synth, {
 					volume: -8,

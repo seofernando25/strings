@@ -1,40 +1,28 @@
-import { type Writable, writable, get } from 'svelte/store';
-import { browser } from '$app/environment';
+import { effect, signal } from '@preact/signals-core';
 import rawMicNode from './rawMicNode';
-import * as Tone from 'tone';
+import { toneContext } from './toneContext';
 
-export const monoMicNode: Writable<ChannelMergerNode | undefined> = writable(undefined, (set) => {
-	let splitter: ChannelSplitterNode | undefined = undefined;
-	let merger: ChannelMergerNode | undefined = undefined;
-	let audioSub: () => void;
-	let micSub: () => void;
+export const monoMicNode = signal<ChannelMergerNode | undefined>(undefined);
 
-	if (browser) {
-		const updateMic = async () => {
-			const ctx = Tone.getContext();
-			if (!ctx) return;
-			const mic = get(rawMicNode);
-			if (!mic) return;
 
-			splitter?.disconnect();
-			merger?.disconnect();
-			if (!ctx) return;
-			splitter = ctx.createChannelSplitter(2);
-			merger = ctx.createChannelMerger(1);
-
-			mic.connect(splitter);
-			splitter.connect(merger, 0, 0);
-			splitter.connect(merger, 1, 0);
-			set(merger as unknown as undefined);
-		};
-
-		micSub = rawMicNode.subscribe(updateMic);
+effect(() => {
+	// Check if we have everything we need
+	const mic = rawMicNode.value;
+	const audioCtx = toneContext.value;
+	if (mic === undefined || audioCtx === undefined) {
+		monoMicNode.value = undefined;
+		return;
+	}
+	// Check if monoMic is not already set
+	if (monoMicNode.value !== undefined) {
+		return;
 	}
 
-	return () => {
-		audioSub?.();
-		micSub?.();
-		splitter?.disconnect();
-		merger?.disconnect();
-	};
+	const splitter = audioCtx.createChannelSplitter(2);
+	const merger = audioCtx.createChannelMerger(1);
+
+	mic.connect(splitter);
+	splitter.connect(merger, 0, 0);
+	splitter.connect(merger, 1, 0);
+	monoMicNode.value = merger;
 });

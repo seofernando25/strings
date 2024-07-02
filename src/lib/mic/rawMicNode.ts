@@ -1,26 +1,27 @@
-import { type Writable, writable, get } from 'svelte/store';
+import { effect, signal } from '@preact/signals-core';
 import { preferredMic } from './preferredMic';
-import { browser } from '$app/environment';
-import * as Tone from 'tone';
-import { audioContextStarted } from './audioContext';
+import { toneContext } from './toneContext';
 
-export const rawMicNode: Writable<MediaStreamAudioSourceNode | undefined> = writable();
+export const rawMicNode = signal<MediaStreamAudioSourceNode | undefined>(undefined);
+export const micSampleRate = signal<number | undefined>(undefined);
 
-async function updateMicrophoneNode() {
+effect(() => {
 	// Clean up old microphone node
-	if (get(rawMicNode) !== undefined) {
-		get(rawMicNode)?.disconnect();
-	}
+	if (rawMicNode.value !== undefined) {
+		rawMicNode.value?.disconnect();
+	}	
 
 	// Check if we have everything we need
-	const mic = get(preferredMic);
-	const audioCtx = Tone.getContext();
+	const mic = preferredMic.value;
+	const audioCtx = toneContext.value;
 	if (mic === undefined || audioCtx === undefined) {
-		rawMicNode.set(undefined);
+		rawMicNode.value = undefined;
+		micSampleRate.value = undefined;
 		return;
 	}
+	
 
-	const stream = await navigator.mediaDevices.getUserMedia({
+	navigator.mediaDevices.getUserMedia({
 		audio: {
 			deviceId: mic.deviceId,
 			echoCancellation: false,
@@ -28,13 +29,12 @@ async function updateMicrophoneNode() {
 			autoGainControl: false
 		},
 		video: false
+	}).then((stream) => {
+		rawMicNode.value  = audioCtx.createMediaStreamSource(stream);
+		const sampleRate = rawMicNode.value.mediaStream.getAudioTracks()[0].getSettings().sampleRate;
+		micSampleRate.value = sampleRate;
 	});
-	rawMicNode.set(audioCtx.createMediaStreamSource(stream));
-}
+});
 
-if (browser) {
-	preferredMic.subscribe(updateMicrophoneNode);
-	audioContextStarted.subscribe(updateMicrophoneNode);
-}
 
 export default rawMicNode;

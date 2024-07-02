@@ -29,56 +29,9 @@
 
 	let tmpImgData: ImageData | null = null;
 
-	$: lineBuf = new ArrayBuffer(height * 4); // 1 line
-	$: lineBuf8 = new Uint8ClampedArray(lineBuf);
-	$: lineImgData = new ImageData(lineBuf8, height, 1); // 1 line of canvas pixels
-
-	$: blankBuf = new ArrayBuffer(height * 4);
-	$: blankBuf8 = new Uint8ClampedArray(blankBuf);
-	$: blankImgData = new ImageData(blankBuf8, height, 1);
-
-	let startOfs = 0;
-
 	function newLine() {
 		horizontalNewLine();
 		// return vert ? verticalNewLine() : horizontalNewLine();
-	}
-
-	function verticalNewLine() {
-		if (!canvasCtx) return;
-		if (sgMode == 'WF') {
-			if (rhc) {
-				// shift the current display down 1 line, oldest line drops off
-				tmpImgData = canvasCtx.getImageData(0, 0, height, width - 1);
-				canvasCtx.putImageData(tmpImgData, 0, 1);
-			} else {
-				// shift the current display up 1 line, oldest line drops off
-				tmpImgData = canvasCtx.getImageData(0, 1, height, width - 1);
-				canvasCtx.putImageData(tmpImgData, 0, 0);
-			}
-		}
-
-		for (
-			let sigVal, rgba, opIdx = 0, ipIdx = startOfs;
-			ipIdx < height + startOfs;
-			opIdx += 4, ipIdx++
-		) {
-			sigVal = dataArray[ipIdx] || 0; // if input line too short add zeros
-			rgba = MATLAB_JET[sigVal]; // array of rgba values
-			// byte reverse so number aa bb gg rr
-			lineBuf8[opIdx] = rgba[0]; // red
-			lineBuf8[opIdx + 1] = rgba[1]; // green
-			lineBuf8[opIdx + 2] = rgba[2]; // blue
-			lineBuf8[opIdx + 3] = rgba[3]; // alpha
-		}
-		canvasCtx.putImageData(lineImgData, 0, nextLine);
-		if (sgMode === 'RS') {
-			incrementLine();
-			// if not static draw a white line in front of the current line to indicate new data point
-			if (lineRate) {
-				canvasCtx.putImageData(blankImgData, 0, nextLine);
-			}
-		}
 	}
 
 	function horizontalNewLine() {
@@ -98,7 +51,9 @@
 		const pageImgData = canvasCtx.getImageData(0, 0, width, height);
 
 		for (let sigVal, rgba, opIdx, ipIdx = 0; ipIdx < height; ipIdx++) {
-			sigVal = dataArray[ipIdx + startOfs] || 0; // if input line too short add zeros
+			const normalizedHeight = ipIdx / height;
+			sigVal = dataArray[ipIdx] || 0;
+
 			rgba = MATLAB_JET[sigVal]; // array of rgba values
 			opIdx = 4 * ((height - ipIdx - 1) * width + nextLine);
 			// byte reverse so number aa bb gg rr
@@ -179,18 +134,6 @@
 
 	function clear() {
 		canvasCtx?.clearRect(0, 0, width, height);
-		// make a white line, it will show the input line for RS displays
-		// blankBuf8.fill(255);
-		// make a full canvas of the color map 0 values
-		// for (let i = 0; i < pxPerLine * lines * 4; i += 4) {
-		// byte reverse so number aa bb gg rr
-		// clearBuf8[i] = MATLAB_JET[0][0]; // red
-		// clearBuf8[i + 1] = MATLAB_JET[0][1]; // green
-		// clearBuf8[i + 2] = MATLAB_JET[0][2]; // blue
-		// clearBuf8[i + 3] = MATLAB_JET[0][3]; // alpha
-		// }
-
-		// canvasCtx?.putImageData(clearImgData, 0, 0);
 	}
 
 	function setLineRate(newRate: number) {
@@ -207,8 +150,6 @@
 	}
 
 	onMount(() => {
-		// Set willreadfrequently to true to allow the browser to optimize the canvas
-
 		clear();
 		start();
 	});

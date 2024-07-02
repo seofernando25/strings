@@ -1,78 +1,52 @@
-import { get, writable, type Writable } from 'svelte/store';
-import { browser } from '$app/environment';
+import { computed, effect, signal } from '@preact/signals-core';
+import { get } from 'svelte/store';
 import { monoMicNode } from './monoMicNode';
-import * as Tone from 'tone';
-export const micGain: Writable<number> = writable(1);
+import { toneContext } from './toneContext';
+export const micGain = signal(1);
 
-export const gainNode: Writable<GainNode | undefined> = writable(undefined, (set) => {
-	let monoMicSub: () => void;
-	let micGainSub: () => void;
-	let gNode: GainNode | undefined = undefined;
 
-	if (browser) {
-		const createGainNode = async () => {
-			const ctx = Tone.getContext();
-			if (!ctx) return;
-			const mic = get(monoMicNode);
-			if (!mic) return;
 
-			// Create gain node
-			gNode = get(gainNode);
-			if (gNode === undefined) {
-				gNode = ctx.createGain();
-			}
-			gNode.gain.value = get(micGain);
-			mic.connect(gNode);
-
-			set(gNode as unknown as undefined);
-		};
-
-		const updateGain = () => {
-			const node = get(gainNode);
-			if (node !== undefined) {
-				node.gain.value = get(micGain);
-			}
-		};
-
-		micGainSub = micGain.subscribe(updateGain);
-		monoMicSub = monoMicNode.subscribe(createGainNode);
+export const gainNode = computed(() => {
+	const ctx = toneContext.value;
+	if (ctx === undefined) {
+		return;
 	}
 
-	return () => {
-		monoMicSub?.();
-		micGainSub?.();
-		gNode?.disconnect();
-	};
+	const mic = monoMicNode.value;
+	if (!mic) return;
+
+	// Create gain node
+	let gNode = ctx.createGain();
+	gNode.gain.value = micGain.value;
+	mic.connect(gNode);
+	return gNode;
 });
 
+
 async function createGainNode() {
-	let node = get(gainNode);
+	let node = gainNode.value;
 	if (node !== undefined) {
 		return;
 	}
 
-	const audioCtx = Tone.getContext();
+	const audioCtx = toneContext.value;
 	if (audioCtx === undefined) {
 		return;
 	}
 
 	node = audioCtx.createGain();
 	node.gain.value = get(micGain);
-	gainNode.set(node);
+	return node;
 }
 
-async function updateGain() {
-	const node = get(gainNode);
+effect(() => {
+	const node = gainNode.value;
 	if (node !== undefined) {
 		node.gain.value = get(micGain);
 		return;
 	} else {
-		await createGainNode();
+		createGainNode();
 	}
-}
-
-if (browser) {
-	micGain.subscribe(updateGain);
-}
+})
 
 export default micGain;

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 
 	export let dataArray: Uint8Array = new Uint8Array(0);
-	export let bufferLength: number = 0;
+	$: bufferLength = dataArray.length;
 
 	let canvas: HTMLCanvasElement;
 	let width = 0;
@@ -31,8 +31,8 @@
 		let x = 0;
 
 		for (let i = 0; i < bufferLength; i++) {
-			const v = dataArray[i] / 128.0;
-			const y = v * (canvas.height / 2);
+			const v = dataArray[i];
+			const y = canvas.height / 2 + v - 128.0;
 
 			if (i === 0) {
 				canvasCtx.moveTo(x, y);

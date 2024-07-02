@@ -12,7 +12,7 @@
 	console.log(song);
 </script>
 
-<header class="bg-gray-800 text-white py-4 px-8 flex justify-between items-center">
+<header class="bg-gray-800 text-white py-4 px-8 flex justify-between items-center h-fit">
 	<h1 class="text-2xl font-bold">{song.title} by {song.artist}</h1>
 	{#if song}
 		{#if song.parts ?? 0 > 0}

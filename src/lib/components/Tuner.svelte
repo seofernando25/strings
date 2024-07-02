@@ -14,7 +14,7 @@
 	// If value left to middle turn up, else down
 </script>
 
-<div class="bg-primary text-primary-content rounded p-2">
+<div class="bg-primary text-primary-content rounded p-2 overflow-clip">
 	<div class="h-2 bg-gray-200 rounded-full relative overflow-x">
 		<!-- Red dot in center -->
 		<div
