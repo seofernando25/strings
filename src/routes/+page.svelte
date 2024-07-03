@@ -1,18 +1,26 @@
 <script lang="ts">
 	import score from '$lib/assets/music.xml?raw';
-	import {
-		Song,
-		type MusicEvent,
-		getSongPartEventRawTimed,
-		playSongPart
-	} from '$lib/songParser/song';
-	import { onDestroy, onMount } from 'svelte';
+	import { analyzer } from '$lib/mic';
 	import { audioContextStarted } from '$lib/mic/audioContext';
-	import * as Tone from 'tone';
-	import { browser } from '$app/environment';
-	import { tweened } from 'svelte/motion';
+	import {
+		audioFrequencies,
+		audioFrequenciesTick,
+		weightedAudioFrequencyIndex,
+		windowAverageFrequency
+	} from '$lib/mic/audioFrequencies';
+	import { micSampleRate } from '$lib/mic/rawMicNode';
+	import { noteToFreq } from '$lib/notes';
+	import {
+		getSongPartEventRawTimed,
+		playSongPart,
+		Song,
+		type MusicEvent
+	} from '$lib/songParser/song';
 	import { SongClock } from '$lib/songParser/songclock';
+	import { findOutlierIndexes, groupNumbers } from '$lib/stat';
 	import { effect } from '@preact/signals-core';
+	import { onMount } from 'svelte';
+	import * as Tone from 'tone';
 
 	let synth: Tone.PolySynth | null = null;
 	let song: Song | null = null;
@@ -20,46 +28,102 @@
 	let songClock: SongClock = new SongClock();
 	// Only show events that have happened after the current time slice 10
 	$: songPlaybackTime = 0;
-	onMount(async () => {
-		song = new Song(score);
-		songClock.setTimeline(getSongPartEventRawTimed(song.parts.find((part) => part.id === 'P1')!));
 
-		songClock.addEventListener(({ time, event, remaining }) => {
-			songPlaybackTime = time;
-			timed = remaining;
-		});
+	function onAnimframe() {
+		songPlaybackTime += songClock?.getDelta() ?? 0;
+		requestAnimationFrame(onAnimframe);
+	}
 
-		setInterval(() => {
-			songPlaybackTime += songClock?.getDelta() ?? 0;
-		}, 10);
+	effect(() => {
+		console.log('Audio Context Changed');
 
-		effect(() => {
-			console.log('Audio Context Changed');
-
-			const started = audioContextStarted.value;
-			if (!started) {
-				Tone.Transport.start();
-				synth = new Tone.PolySynth(Tone.Synth, {
-					volume: -8,
-					oscillator: {
-						type: 'amtriangle20'
-					},
-					portamento: 0,
-					detune: 0,
-					envelope: {
-						attack: 0.01,
-						decay: 0.2,
-						release: 1,
-						sustain: 0
-					}
-				}).toDestination();
-			}
-		});
+		const started = audioContextStarted.value;
+		if (!started) {
+			Tone.Transport.start();
+			synth = new Tone.PolySynth(Tone.Synth, {
+				volume: -8,
+				oscillator: {
+					type: 'amtriangle20'
+				},
+				portamento: 0,
+				detune: 0,
+				envelope: {
+					attack: 0.01,
+					decay: 0.2,
+					release: 1,
+					sustain: 0
+				}
+			}).toDestination();
+		}
 	});
 
-	$: songPlaybackTimeDisplay = tweened(0, {
-		duration: 50,
-		easing: (t) => t * t
+	let averageGroupedIndexes: number[] = [];
+	let currentFrequencies: [number, number, number][] = [];
+	$: {
+		$audioFrequenciesTick;
+
+		averageGroupedIndexes = findOutlierIndexes(audioFrequencies).toSorted((a, b) => a - b);
+		const groupCloseIndexes = groupNumbers(averageGroupedIndexes);
+		// Avg each group
+		averageGroupedIndexes = groupCloseIndexes
+			.reduce((acc, group) => {
+				const avg = group.reduce((a, b) => a + b, 0) / group.length;
+				acc.push(avg);
+				return acc;
+			}, [])
+			.filter((idx) => weightedAudioFrequencyIndex(idx) > 74);
+		if (averageGroupedIndexes.length > 0) {
+			currentFrequencies = averageGroupedIndexes.map((idx) => [
+				idx, // Index in fft
+				weightedAudioFrequencyIndex(idx),
+				idx * (($micSampleRate ?? 0) / analyzer.value.fftSize) // Frequency in Hz
+			]);
+			// Sort by strenght
+			currentFrequencies.sort((a, b) => b[1] - a[1]);
+		} else {
+			currentFrequencies = [];
+		}
+	}
+
+	let musicFreqIndex = 100;
+
+	onMount(async () => {
+		song = new Song(score);
+		const songPart = getSongPartEventRawTimed(song.parts.find((part) => part.id === 'P1')!);
+		timed = songPart.filter(([time, event]) => event.type === 'note_play');
+
+		songClock.setTimeline(songPart);
+
+		let eventIndex = 0;
+		const interval = setInterval(() => {
+			// Check if current note is correct
+			const event = timed[eventIndex][1];
+			if (event.type === 'note_play') {
+				// Deep clone currentFrequencies
+				const currentFrequenciesCopy = currentFrequencies.map((freq) => [...freq]);
+				const musicFreq = noteToFreq({
+					note: event.pitch.step,
+					octave: event.pitch.octave,
+					cents: event.pitch.alter,
+					freq: 0
+				});
+				// Convert freq to fft index
+				musicFreqIndex = Math.round((musicFreq * analyzer.value.fftSize) / ($micSampleRate ?? 0));
+
+				const strenght = windowAverageFrequency(musicFreqIndex);
+
+				if (strenght > 125) {
+					eventIndex++;
+				}
+			}
+		});
+		return () => clearInterval(interval);
+		// songClock.addEventListener(({ time, event, remaining }) => {
+		// 	songPlaybackTime = time;
+		// 	timed = remaining;
+		// });
+
+		// onAnimframe();
 	});
 
 	let times: { note: number; eventT: any }[] = [];
@@ -84,12 +148,6 @@
 
 		isPlaying = !isPlaying;
 	}
-
-	onDestroy(() => {
-		if (browser) {
-			console.log('destroyed');
-		}
-	});
 </script>
 
 {#if song}
@@ -109,20 +167,6 @@
 		<button on:click={togglePlayback} class="btn btn-primary w-full">
 			{isPlaying ? 'Click to Pause' : 'Click to Play'}
 		</button>
-
-		<!-- Slider -->
-		<!-- content here -->
-		<div class="flex items-center gap-4">
-			<div class="w-10">{$songPlaybackTimeDisplay.toFixed(2)}</div>
-			<input
-				type="range"
-				min="0"
-				max="150"
-				step="0.01"
-				bind:value={$songPlaybackTimeDisplay}
-				class="range w-full"
-			/>
-		</div>
 	</div>
 {/if}
 
@@ -136,6 +180,22 @@
 </div>
 
 {songPlaybackTime}
+<!-- {lastValidPitch} -->
+<!-- {#each currentFrequencies as [idx, freq, hz]}
+	<pre>
+	{idx} {freq} {hz}
+</pre>
+{/each} -->
+
+<pre>
+	musicFreqIndex: {musicFreqIndex}
+	{#key $audioFrequenciesTick}
+		a {$audioFrequenciesTick}
+		strenght: {windowAverageFrequency(musicFreqIndex)}
+	{/key}
+	
+</pre>
+
 <!-- timed -->
 <div class="overflow-x-auto">
 	<table class="table">
@@ -145,9 +205,7 @@
 				<th></th>
 				<th>Time</th>
 				<th>Type</th>
-				<th></th>
-				<th></th>
-				<th></th>
+				<th>Note</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -156,6 +214,24 @@
 					<th>{i}</th>
 					<td>{event[0]}</td>
 					<td>{event[1].type}</td>
+					{#if event[1].type === 'note_play'}
+						<td>
+							<!-- Alter half step -->
+							{event[1].pitch.step}
+							<!-- note: event[1].pitch.note, -->
+							{noteToFreq({
+								note: event[1].pitch.step,
+								octave: event[1].pitch.octave,
+								cents: event[1].pitch.alter,
+								freq: 0
+							})}
+						</td>
+
+						<td>
+							Fret: {event[1].fingerTech?.fret}
+							String: {event[1].fingerTech?.string}
+						</td>
+					{/if}
 				</tr>
 			{/each}
 		</tbody>

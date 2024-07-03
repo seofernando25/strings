@@ -23,30 +23,12 @@ export const gainNode = computed(() => {
 });
 
 
-async function createGainNode() {
-	let node = gainNode.value;
-	if (node !== undefined) {
-		return;
-	}
-
-	const audioCtx = toneContext.value;
-	if (audioCtx === undefined) {
-		return;
-	}
-
-	node = audioCtx.createGain();
-	node.gain.value = get(micGain);
-	return node;
-}
-
 effect(() => {
 	const node = gainNode.value;
 	if (node !== undefined) {
-		node.gain.value = get(micGain);
+		node.gain.value = micGain.value;
 		return;
-	} else {
-		createGainNode();
-	}
+	} 
 })
 
 export default micGain;

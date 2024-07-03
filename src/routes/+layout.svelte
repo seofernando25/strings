@@ -27,6 +27,7 @@
 <div class="h-screen flex flex-col">
 	<header class="ps-4 pe-4 flex items-center place-content-between">
 		<div class="gap-2">
+			<a class="btn btn-ghost normal-case text-xl" href="/">Home</a>
 			<a class="btn btn-ghost normal-case text-xl" href="/tuner">Tuner</a>
 			<a class="btn btn-ghost normal-case text-xl" href="/game">Game</a>
 			<a class="btn btn-ghost normal-case text-xl" href="/spectrogram">Spectrogram</a>
