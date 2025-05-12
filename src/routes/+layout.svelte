@@ -23,8 +23,8 @@
 {#if !$audioContextStarted}
 	<button
 		class="z-50 fixed inset-0 flex items-center justify-center text-4xl md:text-6xl lg:text-7xl text-center font-bold text-white bg-gray-900 bg-opacity-70"
-		on:click={initializeTone}
-		on:keydown={handleKeyDown}
+		onclick={initializeTone}
+		onkeydown={handleKeyDown}
 	>
 		Click anywhere to start AudioContext
 	</button>
