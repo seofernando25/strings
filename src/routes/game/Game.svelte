@@ -10,14 +10,18 @@
 		type SongPart
 	} from '$lib/songParser/song';
 
-	import audio from '$lib/assets/music.m4a?url';
+	import audioFile from '$lib/assets/music.m4a?url';
 	import { Text } from '@threlte/extras';
 	import { tweened } from 'svelte/motion';
+
+	// Runes are global
+
+	let { songPart } = $props<{ songPart: SongPart }>();
+
 	function degToRad(deg: number) {
 		return (deg * Math.PI) / 180;
 	}
 
-	// 1 to 26 generator
 	const frets = Array.from({ length: 26 }, (_, i) => i).filter((i) => i !== 0);
 	const guitarScale = 50;
 	const noteSpeed = 50;
@@ -39,32 +43,30 @@
 		return (1 - fret_ratio(fretNum)) * guitarScale;
 	}
 
-	export let songPart: SongPart;
 	let rawTimings: [number, MusicEvent][] = [];
-	let part: SongPart | undefined;
-	$: rawNotes = rawTimings.filter(([t, event]) => event.type === 'note_play') as [
-		number,
-		NotePlayEvent
-	][];
-	let songPlaybackTime = 0;
-	let player: HTMLAudioElement | null = null;
-	let closestNoteIdx = 0;
-	$: averageNoteX =
+	let rawNotes: [number, NotePlayEvent][] = [];
+	let songPlaybackTime = $state(0);
+	let player = $state<HTMLAudioElement | null>(null);
+	let closestNoteIdx = $state(0);
+
+	const averageNoteX = $derived(
 		rawNotes.slice(closestNoteIdx, closestNoteIdx + 10).reduce((acc, [t, event]) => {
 			const fret = event.fingerTech?.fret ?? 0;
 			if (fret === 0) {
 				return acc;
 			}
 			return acc + (fret ? fret_position(0.5 + fret) ?? 0 : -1);
-		}, 0) / 10;
+		}, 0) / 10
+	);
 
-	$: tweenedXPos = tweened(0, {
+	const tweenedXPos = tweened(0, {
 		duration: 250
 	});
 
-	$: {
+	$effect(() => {
 		tweenedXPos.set(averageNoteX);
-	}
+	});
+
 	onMount(async () => {
 		player?.play();
 		rawTimings = getSongPartEventRawTimed(songPart);
@@ -77,14 +79,14 @@
 
 		setInterval(() => {
 			songPlaybackTime = 1.9 + (player?.currentTime ?? 0);
-			if (songPlaybackTime > rawNotes[closestNoteIdx][0]) {
+			if (closestNoteIdx < rawNotes.length && songPlaybackTime > rawNotes[closestNoteIdx][0]) {
 				closestNoteIdx++;
 			}
 		}, 16);
 	});
 </script>
 
-<audio src={audio} bind:this={player}> </audio>
+<audio src={audioFile} bind:this={player}> </audio>
 
 <T.PerspectiveCamera makeDefault position.x={$tweenedXPos} position.y={10} position.z={30} fov={60}>
 	<OrbitControls
@@ -95,7 +97,7 @@
 		target.z={1}
 		minDistance={15}
 		maxDistance={15}
-		on:create={(event) => {
+		oncreate={(event: any) => {
 			event.ref.update(0);
 		}}
 	/>
@@ -172,7 +174,7 @@
 	{#if event.fingerTech?.fret === 0}
 		<T.Mesh
 			position.z={(-t + songPlaybackTime) * noteSpeed}
-			position.y={event.fingerTech?.string ? event.fingerTech?.string ?? 0 : 10}
+			position.y={event.fingerTech && event.fingerTech.string !== undefined && event.fingerTech.string !== null ? event.fingerTech.string : 10}
 			position.x={guitarScale / 2}
 		>
 			<T.BoxGeometry args={[guitarScale, 0.5, 0.4]} />
@@ -181,7 +183,7 @@
 	{:else}
 		<T.Mesh
 			position.z={(-t + songPlaybackTime) * noteSpeed}
-			position.y={event.fingerTech?.string ? event.fingerTech?.string ?? 0 : 10}
+			position.y={event.fingerTech && event.fingerTech.string !== undefined && event.fingerTech.string !== null ? event.fingerTech.string : 10}
 			position.x={event.fingerTech?.fret
 				? event.duration + fret_position(0.5 + event.fingerTech?.fret) ?? 0
 				: -1}
@@ -198,8 +200,8 @@
 </T.Mesh>
 
 <!-- Print each measure start -->
-{#if part}
-	{#each part.measures as measure, i}
+{#if songPart}
+	{#each songPart.measures as measure, i}
 		{measure.time}
 		<Text
 			text={i.toString()}

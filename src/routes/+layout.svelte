@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { audioContextStarted } from '$lib/mic/audioContext';
 	import { onMount } from 'svelte';
-	import '../app.postcss';
+	import '../app.css';
+
+	let { children } = $props(); // Define children prop for the slot
 
 	async function initializeTone() {
 		await tone.start();
@@ -45,11 +47,11 @@
 			<div class="dropdown dropdown-end">
 				<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
 				<label tabindex="0" class="btn btn-ghost btn-circle avatar">
-					<div class="w-10 rounded-full bg-white" />
+					<div class="w-10 rounded-full bg-white"></div>
 				</label>
 			</div>
 		</div>
 	</div>
 
-	<slot />
+	{@render children()} <!-- Use render tag for the default slot -->
 </div>

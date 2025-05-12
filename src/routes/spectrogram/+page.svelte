@@ -1,32 +1,51 @@
 <script lang="ts">
 	import Spectogram from '$lib/components/Spectogram.svelte';
-	import { analyzer, gainNode } from '$lib/mic';
-	import { onMount } from 'svelte';
+	import { analyzer } from '$lib/mic';
 	import { browser } from '$app/environment';
-	$: bufferLength = $analyzer ? $analyzer.frequencyBinCount : 0;
-	$: dataArray = new Uint8Array(bufferLength);
 
-	onMount(async () => {
-		const tone = await import('tone');
-		let node = $gainNode;
-		let audioCtx = tone.getContext();
-		if (!node) return;
-		if (!audioCtx) return;
+	// Reactive state using runes
+	const bufferLength = $derived($analyzer ? $analyzer.frequencyBinCount : 0);
+	let dataArray = $state(new Uint8Array(0)); // Initialized empty, $effect will resize
 
-		node.connect(audioCtx.rawContext.destination);
-		setInterval(() => {
-			$analyzer?.getByteFrequencyData(dataArray);
-			dataArray = dataArray;
-		}, 16);
+	// Effect to resize dataArray when bufferLength changes
+	$effect(() => {
+		// Ensure bufferLength is valid before resizing
+		if (bufferLength > 0 && dataArray.length !== bufferLength) {
+			console.log(`Resizing dataArray to ${bufferLength}`);
+			dataArray = new Uint8Array(bufferLength);
+		}
+	});
+
+	// Effect to continuously update dataArray
+	$effect(() => {
+		const currentAnalyzer = $analyzer;
+		// Only run if analyzer is available and dataArray has been initialized
+		if (currentAnalyzer && dataArray.length > 0) {
+			console.log("Starting interval to update dataArray");
+			const intervalId = setInterval(() => {
+				// Create a temporary array to hold the new data
+				const newData = new Uint8Array(bufferLength); 
+				currentAnalyzer.getByteFrequencyData(newData);
+				// Assign the new data to trigger reactivity
+				dataArray = newData; 
+			}, 50); // Update rate ~20fps
+
+			// Cleanup function for the effect
+			return () => {
+				console.log("Clearing interval for dataArray update");
+				clearInterval(intervalId);
+			};
+		} else {
+			console.log("Analyzer not ready or dataArray not initialized");
+		}
 	});
 </script>
 
 <div class="w-full break-all">
-	{dataArray}
+	{dataArray.length > 0 ? dataArray.slice(0, 100).join(', ') + '...' : 'Waiting for data...'}
 </div>
-<div class="bg-red-50 h-[50%]">
-	{#if browser}
-		<!-- content here -->
+<div class="bg-base-200 h-[50%]">
+	{#if browser && dataArray.length > 0}
 		<Spectogram {dataArray}></Spectogram>
 	{/if}
 </div>

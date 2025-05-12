@@ -1,5 +1,19 @@
 <script lang="ts">
 	import { preferredMic, micList } from '$lib/mic';
+	// MediaDeviceInfo is a built-in type
+
+	// Local state mirroring the store value
+	let selectedMic = $state<MediaDeviceInfo | undefined>($preferredMic);
+
+	// Effect to update the store when local state changes
+	$effect(() => {
+		preferredMic.set(selectedMic);
+	});
+
+	// Simpler effect to update local state if store changes elsewhere
+	$effect(() => {
+		selectedMic = $preferredMic;
+	});
 </script>
 
 <div>
@@ -13,7 +27,7 @@
 <div>
 	<span
 		>Selected:
-		{#if $preferredMic}
+		{#if $preferredMic} {/* Revert to using store value */}
 			{$preferredMic.label}
 		{:else}
 			None

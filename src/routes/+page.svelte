@@ -11,15 +11,16 @@
 	import * as Tone from 'tone';
 	import { browser } from '$app/environment';
 	import { tweened } from 'svelte/motion';
+	import { cubicIn } from 'svelte/easing';
 	import { SongClock } from '$lib/songParser/songclock';
+	import type { SongPart } from '$lib/songParser/song';
 
 	let synth: Tone.PolySynth | null = null;
 	let song: Song | null = null;
 
-	$: timed = [] as [number, MusicEvent][];
+	let timed = $state([] as [number, MusicEvent][]);
 	let songClock: SongClock = new SongClock();
-	// Only show events that have happened after the current time slice 10
-	$: songPlaybackTime = 0;
+	let songPlaybackTime = $state(0);
 	onMount(async () => {
 		song = new Song(score);
 		songClock.setTimeline(getSongPartEventRawTimed(song.parts.find((part) => part.id === 'P1')!));
@@ -57,23 +58,32 @@
 		});
 	});
 
-	$: songPlaybackTimeDisplay = tweened(0, {
+	const songPlaybackTimeDisplay = tweened(0, {
 		duration: 50,
-		easing: (t) => t * t
+		easing: cubicIn
+	});
+
+	$effect(() => {
+		songPlaybackTimeDisplay.set(songPlaybackTime);
 	});
 
 	let times: { note: number; eventT: any }[] = [];
-	$: selected = 'P1';
-	$: songPart = song?.parts.find((part) => part.id === selected)!;
+	let selected = $state('P1');
+	const songPart: SongPart | null = $derived(() => {
+		if (song && song.parts) {
+			const part = song.parts.find((p) => p.id === selected);
+			return part || null;
+		}
+		return null;
+	});
 	async function playSong() {
-		const songPartMaybe = songPart;
-		if (!songPartMaybe) {
+		if (!songPart) {
 			return;
 		}
-		playSongPart(songPartMaybe);
+		playSongPart(songPart);
 	}
 
-	let isPlaying = false;
+	let isPlaying = $state(false);
 	function togglePlayback() {
 		if (isPlaying) {
 			Tone.Transport.pause();
@@ -105,13 +115,11 @@
 	</header>
 
 	<div class="p-4 flex flex-col gap-4">
-		<button on:click={playSong} class="btn btn-primary w-full">Play Song</button>
-		<button on:click={togglePlayback} class="btn btn-primary w-full">
+		<button onclick={playSong} class="btn btn-primary w-full">Play Song</button>
+		<button onclick={togglePlayback} class="btn btn-primary w-full">
 			{isPlaying ? 'Click to Pause' : 'Click to Play'}
 		</button>
 
-		<!-- Slider -->
-		<!-- content here -->
 		<div class="flex items-center gap-4">
 			<div class="w-10">{$songPlaybackTimeDisplay.toFixed(2)}</div>
 			<input
@@ -119,7 +127,7 @@
 				min="0"
 				max="150"
 				step="0.01"
-				bind:value={$songPlaybackTimeDisplay}
+				bind:value={songPlaybackTime}
 				class="range w-full"
 			/>
 		</div>
@@ -136,10 +144,8 @@
 </div>
 
 {songPlaybackTime}
-<!-- timed -->
 <div class="overflow-x-auto">
 	<table class="table">
-		<!-- head -->
 		<thead>
 			<tr>
 				<th></th>
